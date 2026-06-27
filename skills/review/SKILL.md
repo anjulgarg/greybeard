@@ -1,13 +1,14 @@
 ---
 name: review
-description: Check a pull request or diff against the project's recorded decisions (docs/greybeard/) and flag changes that violate them. Fans out one read-only sub-agent per decision category file; each matches the diff — WITH the current file contents, by meaning not line number — against its decisions and reports only high-confidence violations, citing the rule, the why, and the originating evidence. Precision-biased: a false alarm costs more than a miss.
+description: Check a PR, diff, branch, local change set, document, or other supplied change against the project's recorded decisions (docs/greybeard/) and flag changes that violate them. Fans out one read-only sub-agent per decision category file; each matches the change — WITH current file/document contents where available, by meaning not line number — against its decisions and reports only high-confidence violations, citing the rule, the why, and the originating evidence. Precision-biased: a false alarm costs more than a miss.
 ---
 
 # /greybeard:review
 
-The payoff of the decision memory. Given a PR or diff, surface changes that break a recorded
-decision — **with the rule, why it exists, and the original evidence** — so the author fixes it
-before merge instead of a reviewer re-deriving the rule from scratch (again).
+The payoff of the decision memory. Given a PR, diff, branch, local change set, document, or other
+supplied change, surface changes that break a recorded decision — **with the rule, why it exists,
+and the original evidence** — so the author fixes it before merge instead of a reviewer re-deriving
+the rule from scratch (again).
 
 Validated at **86% / 75% / 12%** on the calibration repo (strict recall / zero-overlap recall /
 false-alarm rate). The **12% false-alarm number is the one to protect: precision over recall.** A
@@ -18,10 +19,12 @@ value. **When a sub-agent is unsure, it stays silent.**
 
 ## Inputs (auto-detect, confirm)
 
-1. **target** — one of:
+1. **target** — any supplied change, including:
    - a **PR number** → diff vs its base (`gh pr diff <N>` / ADO equivalent),
    - a **branch** → `git diff <base>...HEAD`,
-   - **local changes** → staged/unstaged working tree.
+   - **local changes** → staged/unstaged working tree,
+   - a **diff/patch file**,
+   - a **document or text artifact**.
    Default: PR if a number is given, else current branch vs its base, else the working tree.
 2. **provider** — `github` / `azure-devops`, for fetching a PR and (optionally) posting comments.
 
@@ -34,17 +37,17 @@ They are few (**≤5**, enforced at write time by learn/remember) and independen
 
 ```
 ORCHESTRATOR
-  - resolve target -> changed files + diff hunks
-  - load the CURRENT contents of each changed file (NOT just the diff)   <- critical, see below
+  - resolve target -> changed files/documents + locations
+  - load the CURRENT contents for changed files/documents where available   <- critical, see below
   - list docs/greybeard/ category files; load only LIVE decisions (skip tombstoned/superseded)
     from the BASE branch, NEVER the PR head — a PR must not weaken the rules it is judged by
         |
         | fan out one sub-agent per category file (all parallel; count = #category files)
         v
-  SUB-AGENT (read-only)   <- one category file + the diff + current contents of changed files
-    for each LIVE decision whose SCOPE intersects the changed files:
+  SUB-AGENT (read-only)   <- one category file + the change + current contents where available
+    for each LIVE decision that appears semantically relevant to the change:
       does this change move AGAINST the rule?  match by MEANING, not line number
-      emit { decision_id, evidenceType, file, hunk, why, confidence, fix? }  ONLY if high-confidence
+      emit { decision_id, evidenceType, location, why, confidence, fix? }  ONLY if high-confidence
         |
         | collect all sub-agent findings
         v
@@ -56,16 +59,16 @@ ORCHESTRATOR
 Why per-category-file fan-out:
 - **Bounded** by category count (**≤5**, enforced when decisions are written) — no extra concurrency cap or streaming required. If one category
   file holds an unusually large number of decisions, that sub-agent walks them decision-by-decision.
-- **Tight context** — each sub-agent sees one category's rules + the diff, nothing else.
+- **Tight context** — each sub-agent sees one category's rules + the supplied change, nothing else.
 - **Read-only** — only the orchestrator emits the single report; no write races.
 
 ---
 
 ## What each sub-agent MUST receive (the validated invariants)
 
-1. **Current file contents, not just the diff.** Both validation errors were diff-only artifacts: a
-   rule can be satisfied or broken by code *outside* the changed hunk. The sub-agent needs full file
-   state to judge.
+1. **Current contents, not just the diff.** For code diffs, both validation errors were diff-only
+   artifacts: a rule can be satisfied or broken by code *outside* the changed hunk. The sub-agent
+   needs full file state to judge when that state is available.
 2. **Match by meaning, not line number.** The diff's hunk lines and a decision's original lines will
    not align (squash merges, later iterations, unrelated edits).
 3. **The decision's `why` + `evidence`**, so every flag explains itself and the author can judge
@@ -76,7 +79,7 @@ Why per-category-file fan-out:
 ## Evidence-type handling
 
 - **Code-verified decisions** — directly checkable. Flag a **violation** when the change moves
-  *against* the rule within its scope.
+  *against* the rule.
 - **Human-attested facts** — a diff cannot "violate" a fact. Instead emit an **advisory** when the
   change touches the fact's subject ("this edits the event hub owned by `<team>` — coordinate?").
   Advisory, never a blocking violation.
@@ -88,8 +91,7 @@ Why per-category-file fan-out:
 ## Skip (reduces false fire)
 
 - **Tombstoned / superseded** decisions — never check; they are history.
-- A decision whose **scope clearly does not intersect** the changed files — do not even load it into
-  the match.
+- A decision that is clearly unrelated to the supplied change — do not force a match.
 
 ---
 
@@ -101,7 +103,7 @@ A report, and optionally PR review comments. Per finding:
 [VIOLATION | ADVISORY]  <decision_id>  (<category>)  conf:<high|med>
   rule:   <one-line statement>
   why:    <the rationale — why this rule exists>
-  where:  <file>:<hunk>
+  where:  <file>:<hunk> or <document>:<section>
   basis:  PR <N> (<date>) — "<original evidence quote>"      <- the payoff: traces to a real decision
   fix:    <concrete suggestion, if one is clear>
 ```
@@ -124,3 +126,8 @@ sign the tool did nothing.
    delete a rule could violate it and still pass. The rules are the base branch's, not the author's.
 6. **Cite the evidence on every finding.** An unexplained flag gets ignored; the originating PR/quote
    is what makes the author trust and act on it.
+
+## Decision entry format
+
+Read `../decision-entry-format.md` before interpreting entries. That file is the canonical schema
+shared by `/greybeard:learn`, `/greybeard:remember`, and `/greybeard:review`.

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/social-preview.png" alt="Greybeard — institutional memory for AI coding agents. Every commit. Every decision. Every lesson. Remembered." width="720" />
+  <img src="assets/greybeard-banner.png" alt="Greybeard — institutional memory for AI coding agents. Every commit. Every decision. Every lesson. Remembered." width="720" />
 </div>
 
 **greybeard** is a **decision-memory** for your codebase. It captures the durable engineering
@@ -24,18 +24,19 @@ Each skill is an **imperative to the greybeard** — *you* command it to learn, 
 | Skill | Invoke | What it does |
 |-------|--------|--------------|
 | **learn** | `/greybeard:learn` | Mines your merged PR history — review comments, PR descriptions, and the merged diffs — for durable decisions, **verifies each against the code that actually shipped**, and bootstraps your `docs/greybeard/` folder. Run once at setup. |
-| **remember** | `/greybeard:remember` | Captures one decision by hand. Interviews you for the rule, the *why*, the scope, and the evidence, then opens a PR. Use right after a design call. |
-| **review** | `/greybeard:review` | Checks a PR/diff against your recorded decisions and flags changes that break one — citing the rule, the *why*, and the original evidence. |
+| **remember** | `/greybeard:remember` | Captures one decision by hand. Interviews you for the rule, the *why*, and the evidence, then opens a PR. Use right after a design call. |
+| **review** | `/greybeard:review` | Checks a supplied change against your recorded decisions and flags changes that break one — citing the rule, the *why*, and the original evidence. |
 
 ## How each skill works
 
 ### `review` — one sub-agent per decision file, all in parallel
 
-Point `/greybeard:review` at a PR, a diff, a document, or any
-change you ask about, and it **spins up one sub-agent for every decision file in `docs/greybeard/`**.
-Each sub-agent owns exactly one file and checks the change *only* against the decisions recorded
-there — matching by **meaning** against the current contents of the changed files, never by line
-number. The sub-agents run in parallel (≤5, one per topic file), then a reducer merges their
+Point `/greybeard:review` at a PR, a diff, a branch, local changes, a document, or any change you
+ask about, and it **spins up one sub-agent for every category decision file in `docs/greybeard/`**.
+`index.md` is just the map and does not get its own reviewer. Each sub-agent owns exactly one
+category file and checks the change *only* against the decisions recorded there — matching by
+**meaning** against the current contents of the changed files, never by line number. The sub-agents
+run in parallel (≤5, one per topic file), then a reducer merges their
 findings into a single report that flags every change which breaks a recorded decision, citing the
 **rule**, the **why**, and the **original evidence** behind it.
 
@@ -55,7 +56,7 @@ Run it once at setup, or re-run in `extend` mode to fold in newer history.
 ### `remember` — capture a decision by hand
 
 `/greybeard:remember` records a single decision the moment it's made. It interviews you for the
-rule, the *why*, the scope, and the evidence, checks it against the existing bank for duplicates or
+rule, the *why*, and the evidence, checks it against the existing bank for duplicates or
 supersession, and opens a PR — so the reasoning is captured before it evaporates.
 
 ## How decisions are stored
@@ -74,21 +75,25 @@ docs/greybeard/
 Nothing is hardcoded: a token-handling service grows `data-privacy.md`, a UI library grows
 `accessibility.md`. New decisions reuse the closest existing file; a new file appears only when a
 decision fits none — never beyond 5. `evidence-type` (`code-verified` or `human-attested`) is a
-per-decision tag, not a folder.
+per-decision entry field, not a folder or frontmatter.
+
+The canonical entry schema lives in `skills/decision-entry-format.md`; `learn`, `remember`, and
+`review` reference that file instead of duplicating the format.
 
 Nothing becomes canon until a human approves the PR. That review gate is the precision backstop.
 
 ## Design principles
 
-- **Adoption-gated.** A decision is captured only if the merged code actually adopted it. A
-  reviewer objection that was *overruled* is not a decision — storing it would make `review` flag
-  conformant code. (Real failure this prevents: a "no 100% sampling" comment on a PR that shipped
-  100% sampling anyway.)
+- **Adoption-gated when mined.** A decision learned from PR history is captured only if the merged
+  code actually adopted it. A reviewer objection that was *overruled* is not a decision — storing it
+  would make `review` flag conformant code. Manual `remember` entries may be forward-looking, but
+  still need a why, evidence, and human PR review.
 - **Precision over recall.** A wrong decision poisons every future review, so when unsure greybeard
   drops the candidate or flags it for a human.
 - **Recency wins.** A newer decision that contradicts an older one supersedes it; the old entry is
   *tombstoned*, never deleted.
-- **Evidence, always.** Every decision traces to a real PR / merge SHA / quote.
+- **Evidence, always.** Every decision traces to concrete evidence: a PR / merge SHA / quote for
+  code-verified entries, or a named attestor plus review-by date for human-attested entries.
 
 ## Install
 

@@ -37,7 +37,7 @@ Categories are derived from the decisions, **not** hardcoded. The 5-file cap kee
 `/greybeard:review` fan-out bounded (one sub-agent per category file, ≤5). Bias to the **fewest,
 broadest** buckets that stay coherent: reuse the closest existing file before opening a new one,
 and once 5 exist, fold a new cluster into its nearest neighbour rather than creating a 6th.
-`evidence-type` is a per-decision frontmatter tag, independent of which file holds it. Use
+`evidence-type` is a per-decision entry field, independent of which file holds it. Use
 `code-verified` for rules proven by merged code, and `human-attested` for world facts that code
 cannot prove. Only `code-verified` decisions with an `ADOPTED` verdict are emitted into the final
 decision files; human-attested facts are review notes, not canon.
@@ -77,7 +77,7 @@ parallelized; the global merge (Stages 5–6) is single-threaded.
 ```
 ORCHESTRATOR (single-threaded, cheap)
   Stage 0  ONE bulk list call -> {number, mergeSha, mergedAt, title} for all eligible merged
-           PRs; count, confirm scope, split into <=5 work-balanced batches of PR refs
+           PRs; count, confirm scan size, split into <=5 work-balanced batches of PR refs
         |
         |  fan out <=5 sub-agents total (one per batch, all parallel)
         v
@@ -124,18 +124,15 @@ sub-agents spawned — *not* a concurrency limit, not a per-wave count. The orch
 all eligible PRs into **at most 5 work-balanced batches** and launches **one sub-agent per batch**;
 all run in parallel (5 is small enough to need no wave or queue management).
 
-`B (sub-agents launched) = min(5, PRs_with_comments)`
+`B (sub-agents launched) = min(5, selected_merged_PRs)` for normal scans.
 
-- **Small repos use fewer.** 3 PRs-with-comments → 3 sub-agents, not 5 — don't spawn idle agents.
-  Below ~10 PRs total, skip fan-out and run inline.
-- **Large repos still use exactly 5** — each just gets a bigger batch, absorbed by streaming (below).
+- **Tiny scans run inline.** If the selected slice has about 10 PRs or fewer, skip fan-out.
+- **Small scans use fewer.** 3 selected PRs → 3 sub-agents, not 5 — don't spawn idle agents.
+- **Large scans use exactly 5** — each just gets a bigger batch, absorbed by streaming (below).
 
-**Balance batches by WORK (comment/thread count), not PR count.** PRs are wildly uneven — in the
-calibration repo, 100 PRs but only **46 had any human comments**, 130 comments total, heavily
-skewed. Equal-PR-count batches would dump all the heavy PRs on one sub-agent. So **bin-pack** PRs
-into the ≤5 batches by total comment count, letting an outlier PR (100+ threads) anchor its own
-batch. When the API doesn't expose comment counts cheaply (**ADO**), fall back to equal PR-count
-batches.
+**Put every selected merged PR in exactly one batch.** Do not special-case PRs with zero comments:
+their descriptions can still contain decisions. If comment/thread counts are already available
+cheaply, balance batches by that count; otherwise split by PR count and move on.
 
 **A batch can be large, so each sub-agent STREAMS — it never holds its whole batch in context.**
 With only 5 agents, a 1000-PR scan puts ~200 PRs in each. The sub-agent processes its batch **one
@@ -149,20 +146,16 @@ run will be large and slow and suggests lowering **X** or narrowing the **window
 agent count is fixed, scanning fewer PRs is the only lever that cuts per-agent load.
 
 **Worked examples:**
-- **Calibration** (130 threads across 46 commented PRs): bin-pack into 5 batches ≈ 26 threads each;
-  5 sub-agents, one pass.
-- **1000-PR repo** (~1300 threads): still 5 sub-agents, ~260 threads each, each streaming ~200 PRs
-  to disk → exceeds the 250/agent guardrail → warn and offer to narrow scope.
-- **Tiny repo** (8 PRs, 5 with comments): 5 sub-agents — or, below ~10 PRs, just run inline.
-
-**Degenerate cases:** a PR with 0 comments still carries a description candidate (cheap) → pack it
-in; very small repos (`N ≲ 10`) → skip fan-out, run inline.
+- **8 PRs selected:** run inline.
+- **46 PRs selected:** 5 batches, each with every assigned PR processed one at a time.
+- **1000 PRs selected:** still 5 batches; warn if the known thread load exceeds the guardrail and
+  offer to narrow the scan.
 
 ---
 
 ## Pipeline (6 stages, map-reduce)
 
-### Stage 0 — Enumerate eligible PRs, confirm scope, split into batches (ORCHESTRATOR)
+### Stage 0 — Enumerate eligible PRs, confirm scan size, split into batches (ORCHESTRATOR)
 First **count the merged PRs actually available**, then **always ask the user how many PRs to scan**
 before fanning out — `X` is meaningless if only 60 merged PRs exist, or if 500 exist and the user may
 only want a recent slice. Offer the standard choices (**last 100 PRs**, **all PRs over the last 1
@@ -192,7 +185,7 @@ the literal commit-message prefix (`git log --all --grep "Merged PR <N>:"`). **D
 the bare PR number** — that also matches later PRs whose description merely *references* this PR,
 and silently returns the wrong commit. (This was a real bug.)
 
-Then **split the scoped PR refs into at most 5 work-balanced batches** (by comment count — see
+Then **split the selected PR refs into at most 5 work-balanced batches** (by comment count — see
 **Sizing**) and fan out **one sub-agent per batch (≤5 total, all in parallel)**.
 
 ### Stage 1 — Fetch this batch's evidence sources (SUB-AGENT, per batch)
@@ -256,19 +249,16 @@ reported separately as "not emitted / needs human follow-up", but they are not e
 by `/learn`.
 
 **Sub-agent output contract:** return a JSON array of candidate decisions — each with
-`{statement, why, futureBenefit, reviewCheck, scope, evidenceType, verdict, confidence,
+`{statement, why, futureBenefit, reviewCheck, evidenceType, verdict, confidence,
 evidence:{pr, date, quote, mergeSha, before, after}}`. `futureBenefit` must clearly explain how
 this decision helps future engineers make better decisions in this project; it must be articulate,
 specific, and grounded in project reality (not generic "improves maintainability" filler).
 `reviewCheck` must state what reviewers should check in future PRs to apply this decision — concrete
-evidence, code/config shape, test coverage, rollout boundary, or operational proof to ask for. `scope`
-= the file globs / layers the candidate concerned (you just read them in the adoption check) — it
-bounds `review`'s false-fire later. Scope is internal metadata; use it to route and
-dedupe decisions, but do not emit it into the final decision markdown. The `mergeSha`, `before`, and
-`after` fields are internal adoption-check proof only; use them during reduce/review, but do not emit
-before/after proof into the final decision markdown. **No stable IDs** (the orchestrator assigns
-those after clustering) and **no writes** to `docs/greybeard/`. A batch that fails or returns
-malformed JSON is retried, or the orchestrator processes it directly.
+evidence, code/config shape, test coverage, rollout boundary, or operational proof to ask for. The
+`mergeSha`, `before`, and `after` fields are internal adoption-check proof only; use them during
+reduce/review, but do not emit before/after proof into the final decision markdown. **No stable IDs**
+(the orchestrator assigns those after clustering) and **no writes** to `docs/greybeard/`. A batch
+that fails or returns malformed JSON is retried, or the orchestrator processes it directly.
 
 ### Stage 5 — Reduce: sort, cluster, dedupe, supersede — ORCHESTRATOR
 0. **Sort the merged candidate pool by `mergedAt` (oldest → newest).** Supersession is applied in
@@ -286,12 +276,12 @@ malformed JSON is retried, or the orchestrator processes it directly.
    from the strongest evidence.
 3. **Group into ≤5 category files and assign stable IDs.** Derive emergent topic buckets from the
    clustered decisions (not a fixed list); choose the **fewest, broadest** files that stay coherent,
-   hard-capped at **5** — if a 6th topic appears, fold it into its nearest neighbour and broaden
-   that file's scope. ID = a short prefix from the topic + a number (e.g. `testing` → `T1`,
+   hard-capped at **5** — if a 6th topic appears, fold it into its nearest neighbour. ID = a short
+   prefix from the topic + a number (e.g. `testing` → `T1`,
    `api-compat` → `A1`), stable thereafter.
 4. **Supersession (recency wins), handled carefully:**
-   - Distinguish three cases: **supersede** (same scope, new value — e.g. default 10s → 20s),
-     **coexist** (different scope — a rule for service A vs service B), and **false
+   - Distinguish three cases: **supersede** (same subject, new value — e.g. default 10s → 20s),
+     **coexist** (different subject — a rule for service A vs service B), and **false
      contradiction** (the semantic match was wrong). Only *supersede* replaces.
    - **Tombstone, never delete.** Mark the superseded entry `superseded-by: <id>` + date and
      keep it. History is needed for audit (and contradiction-detection is itself an imperfect
@@ -325,34 +315,8 @@ comments are not low-confidence canon; they are excluded from the final decision
 
 ## Decision entry format
 
-Each decision in a category file:
-
-```markdown
-### <ID>. <one-line imperative statement of the rule>
-<1–3 sentence elaboration, including the WHY.>
-
-**Future benefit:** <1–2 sentences explaining how this decision helps future engineers make better
-decisions in this project, grounded in the actual service/config/test/operational reality.>
-
-**Review check:** <1 sentence telling reviewers exactly what to check in future PRs to apply this
-decision, such as required evidence, code/config shape, tests, rollout scope, or operational proof.>
-
-- evidence-type: code-verified
-- confidence: high | medium
-- evidence:
-  - PR <N> (<date>) — "<verbatim reviewer quote or description excerpt>"
-- superseded-by: <ID> (<date>)              # only if tombstoned
-```
-
-`index.md` carries one line per decision: `- <ID> (<file>) — <one-line statement> [conf]`.
-
-Every decision entry must include a **Future benefit** paragraph. If you cannot write a clear,
-project-grounded future benefit for a candidate, drop it or flag it for human review instead of
-canonizing it.
-
-Every decision entry must also include a **Review check** paragraph. If you cannot state a concrete
-review action, the decision is probably too vague for `review` to use safely; drop it or flag it for
-human review.
+Read `../decision-entry-format.md` before writing or updating entries. That file is the canonical
+schema shared by `/greybeard:learn`, `/greybeard:remember`, and `/greybeard:review`.
 
 ---
 
