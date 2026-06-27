@@ -352,5 +352,21 @@ Each decision in a category file:
 
 After the run, report: PRs scanned, candidates after pre-filter, ADOPTED / DROPPED / PARTIAL /
 human-attested fact counts, number of clustered decisions emitted, and the path to the generated
-`docs/greybeard/` files. Ask the user to review those files. Only include a review PR link if the
-user already approved PR creation in a later step.
+`docs/greybeard/` files. Also list each generated markdown file with its decision count so the user
+knows what to review, e.g.:
+
+```text
+Generated Greybeard decision docs in:
+<repo>\docs\greybeard\
+
+Files created:
+- index.md — 52 decisions indexed
+- auth-api.md — 9 decisions
+- infrastructure-config.md — 15 decisions
+- observability.md — 10 decisions
+- testing-synthetics.md — 15 decisions
+- data-operations.md — 3 decisions
+```
+
+Ask the user to review those files. Only include a review PR link if the user already approved PR
+creation in a later step.
