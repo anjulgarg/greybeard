@@ -1,8 +1,3 @@
----
-name: learn
-description: Bootstrap a project's decision memory by scanning the last X MERGED pull requests. Mines durable engineering decisions from review comments, PR descriptions, and the merged diffs themselves, verifies each against the merged code (adoption check), and emits generated decision markdown files into docs/greybeard/. Run once at setup, or re-run to extend.
----
-
 # /greybeard:learn
 
 Bootstrap (or extend) a repository's **decision memory** by mining its merged pull-request
@@ -48,7 +43,7 @@ decision files; human-attested facts are review notes, not canon.
 ## Inputs (ask the user if not provided)
 
 1. **X** — number of most-recent merged PRs to scan. **Always ask the user** how many PRs the
-   skill should run on before scanning — never silently assume a default. Present sensible choices:
+   workflow should run on before scanning — never silently assume a default. Present sensible choices:
    - **Last 100 PRs** (default if the user just wants a quick bootstrap)
    - **All PRs over the last 1 year** (a `window` of the past 12 months, any count)
    - **From the beginning of the project** (every merged PR in history)
@@ -147,11 +142,11 @@ exceeds the **large-scan warning threshold** (default ~250 threads/agent), the o
 
 ## Pipeline (6 stages, map-reduce)
 
-Before starting Stage 1, read `../decision-candidate.md` and `subagent.md`.
+Before starting Stage 1, read `../references/decision-candidate.md` and `../subagents/learn.md`.
 `decision-candidate.md` is the canonical source for what counts as a decision candidate, what must
-be dropped, evidence routing, and adoption verdicts. `subagent.md` is the system instruction set for
-every PR-scanning sub-agent. This skill owns orchestration; the shared files own candidate judgment
-and sub-agent behavior.
+be dropped, evidence routing, and adoption verdicts. `subagents/learn.md` is the system instruction
+set for every PR-scanning sub-agent. This workflow owns orchestration; the shared files own
+candidate judgment and sub-agent behavior.
 
 ### Stage 0 — Enumerate eligible PRs, confirm scan size, split into batches (ORCHESTRATOR)
 First **count the merged PRs actually available**, then **always ask the user how many PRs to scan**
@@ -203,12 +198,12 @@ The third source — **the merged diff** — is not fetched from the API: it is 
 via `git show <mergeSha>` during the Stage-4 adoption check (local git has no rate limit).
 
 ### Stage 2 — Cheap pre-filter (drop the noise) — SUB-AGENT, per batch
-Apply `../decision-candidate.md` strictly. Most review activity is not a decision; keep only items
+Apply `../references/decision-candidate.md` strictly. Most review activity is not a decision; keep only items
 that pass the shared durability, generalizability, why, evidence, and application-check rules.
 Expect roughly **~15–20%** of comments to survive this stage.
 
 ### Stage 3 — Route each surviving candidate — SUB-AGENT, per batch
-Use the evidence routes in `../decision-candidate.md`:
+Use the evidence routes in `../references/decision-candidate.md`:
 - **Code-checkable decision** — continue to Stage 4.
 - **Human-attested fact** — report as not emitted / needs human follow-up. `/learn` does **not**
   emit these as decisions.
@@ -223,10 +218,10 @@ context**, never just the comment:
 > review iterations move the lines the comment originally pointed at.
 
 Return exactly one adoption verdict per candidate using the verdict definitions in
-`../decision-candidate.md`: `ADOPTED`, `NOT-ADOPTED`, `PARTIAL`, or `NOT-CODE`. Human-attested
+`../references/decision-candidate.md`: `ADOPTED`, `NOT-ADOPTED`, `PARTIAL`, or `NOT-CODE`. Human-attested
 facts skip the adoption check because a diff cannot confirm them.
 
-**Sub-agent output contract:** return the JSON object defined in `subagent.md`.
+**Sub-agent output contract:** return the JSON object defined in `../subagents/learn.md`.
 Each candidate includes `{statement, why, futureBenefit, applicationCheck, evidenceType, verdict,
 confidence, evidence:{pr, date, quote, mergeSha, before, after}}`. `futureBenefit` must clearly
 explain how this decision helps future engineers make better decisions in this project; it must be
@@ -283,7 +278,7 @@ if the user explicitly approves.
 
 ## Confidence ranking
 
-Use the mined confidence rules in `../decision-candidate.md`. Do not emit low-confidence decisions.
+Use the mined confidence rules in `../references/decision-candidate.md`. Do not emit low-confidence decisions.
 Human-attested facts, PARTIAL candidates, and NOT-ADOPTED comments are not low-confidence canon;
 they are excluded from the final decision files.
 
@@ -291,7 +286,7 @@ they are excluded from the final decision files.
 
 ## Decision entry format
 
-Read `../decision-format.md` before writing or updating entries. That file is the canonical
+Read `../references/decision-format.md` before writing or updating entries. That file is the canonical
 schema shared by `/greybeard:learn`, `/greybeard:remember`, and `/greybeard:review`.
 
 ---

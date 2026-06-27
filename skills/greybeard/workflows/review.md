@@ -1,8 +1,3 @@
----
-name: review
-description: Check a PR, diff, branch, local change set, document, or other supplied change against the project's recorded decisions (docs/greybeard/) and flag changes that violate them. Fans out one sub-agent per decision category file; each matches the change — WITH current file/document contents where available, by meaning not line number — against its decisions and reports only high-confidence violations, citing the rule, the why, and the originating evidence. Precision-biased: a false alarm costs more than a miss.
----
-
 # /greybeard:review
 
 The payoff of the decision memory. Given a PR, diff, branch, local change set, document, or other
@@ -32,6 +27,9 @@ value. **When a sub-agent is unsure, it stays silent.**
 
 ## Execution model (map-reduce — fan out per CATEGORY FILE)
 
+Before fanning out, read `../subagents/review.md` and use it as the system instruction set for
+every category-checking sub-agent.
+
 Unlike learn (which partitions *PRs*), here the natural unit is the **decision category file**.
 They are few (**≤5**, enforced at write time by learn/remember) and independent, so fan-out is naturally bounded — at most 5 sub-agents, no streaming needed.
 
@@ -42,13 +40,10 @@ ORCHESTRATOR
   - list docs/greybeard/ category files; load only LIVE decisions (skip tombstoned/superseded)
     from the BASE branch for PR/branch targets, or the provided/current bank for other targets
         |
-        | fan out one sub-agent per category file (all parallel; count = #category files)
+        | fan out one sub-agent per category file using ../subagents/review.md
         v
   SUB-AGENT   <- one category file + the change + current contents where available
-    for each LIVE decision that appears semantically relevant to the change:
-      does this change move AGAINST the rule?  match by MEANING, not line number
-      emit { decision_id, evidenceType, location, why, decisionConfidence, fix? }  ONLY if the
-      finding itself is high-confidence
+    return findings JSON only
         |
         | collect all sub-agent findings
         v
@@ -132,5 +127,5 @@ sign the tool did nothing.
 
 ## Decision entry format
 
-Read `../decision-format.md` before interpreting entries. That file is the canonical schema
+Read `../references/decision-format.md` before interpreting entries. That file is the canonical schema
 shared by `/greybeard:learn`, `/greybeard:remember`, and `/greybeard:review`.

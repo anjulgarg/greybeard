@@ -1,6 +1,6 @@
 {
   "name": "greybeard",
-  "description": "Team decision-memory for codebases. Mines, records, and enforces durable engineering decisions stored as markdown files that evolve with your repo in a docs/greybeard/ folder, gated through PR review. Three skills: learn (bootstrap scan of merged PRs), remember (manual capture), review (verify a supplied change against recorded decisions).",
+  "description": "Team decision-memory for codebases. Mines, records, and enforces durable engineering decisions stored as markdown files that evolve with your repo in a docs/greybeard/ folder, gated through PR review. One greybeard skill with three workflows: learn (bootstrap scan of merged PRs), remember (manual capture), review (verify a supplied change against recorded decisions).",
   "version": "0.1.0",
   "author": {
     "name": "anjulgarg"

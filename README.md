@@ -28,17 +28,18 @@ Most engineering knowledge evaporates the moment it's created:
 
 greybeard turns that ephemeral knowledge into a queryable, enforceable bank.
 
-## The three skills
+## The three workflows
 
-Each skill is an **imperative to the greybeard** — *you* command it to learn, to remember, to review.
+Greybeard installs as one self-contained skill. Each workflow is an **imperative to the
+greybeard** — *you* command it to learn, to remember, to review.
 
-| Skill | Invoke | What it does |
+| Workflow | Invoke | What it does |
 |-------|--------|--------------|
 | **learn** | `/greybeard:learn` | Mines your merged PR history — review comments, PR descriptions, and the merged diffs — for durable decisions, **verifies each against the code that actually shipped**, and bootstraps your `docs/greybeard/` folder. Run once at setup. |
 | **remember** | `/greybeard:remember` | Captures one decision by hand. Interviews you for the rule, the *why*, and the evidence, then suggests a PR as the next step. Use right after a design call. |
 | **review** | `/greybeard:review` | Checks a supplied change against your recorded decisions and flags changes that break one — citing the rule, the *why*, and the original evidence. |
 
-## How each skill works
+## How each workflow works
 
 ### `review` — one sub-agent per decision file, all in parallel
 
@@ -90,11 +91,12 @@ Nothing is hardcoded: a token-handling service grows `data-privacy.md`, a UI lib
 decision fits none — never beyond 5. `evidence-type` (`code-checkable` or `human-attested`) is a
 per-decision entry field, not a folder or frontmatter.
 
-The canonical candidate rules live in `skills/decision-candidate.md`; `learn` sub-agents and
+The canonical candidate rules live in `skills/greybeard/references/decision-candidate.md`; `learn` sub-agents and
 `remember` use that file instead of duplicating the decision-identification rules.
-`skills/learn/subagent.md` contains the system instructions for `learn` PR-scanning
-sub-agents. The canonical entry schema lives in `skills/decision-format.md`; `learn`, `remember`,
-and `review` reference that file instead of duplicating the format.
+`skills/greybeard/subagents/learn.md` and `skills/greybeard/subagents/review.md` contain the
+sub-agent instructions for PR scanning and category checking. The canonical entry schema lives in
+`skills/greybeard/references/decision-format.md`; `learn`, `remember`, and `review` reference that
+file instead of duplicating the format.
 
 Nothing becomes canon until a human approves the PR. That review gate is the precision backstop.
 
@@ -113,9 +115,10 @@ Nothing becomes canon until a human approves the PR. That review gate is the pre
 
 ## Install
 
-greybeard follows the standard plugin layout — a manifest in `.claude-plugin/plugin.json` and the
-three skills under `skills/`. Install it with your agent's plugin manager (e.g. GitHub Copilot CLI
-or Claude Code), or clone it into your plugins directory. The skills then become available as:
+greybeard follows the standard plugin layout — a manifest in `.claude-plugin/plugin.json` and one
+self-contained skill under `skills/greybeard/`. Install it with your agent's plugin manager (e.g.
+GitHub Copilot CLI or Claude Code), or clone it into your plugins directory. The workflows then
+become available as:
 
 ```
 /greybeard:learn       # bootstrap decisions from PR history

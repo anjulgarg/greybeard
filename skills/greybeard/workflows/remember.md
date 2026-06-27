@@ -1,8 +1,3 @@
----
-name: remember
-description: Manually record ONE engineering decision into the project's decision memory (docs/greybeard/). Interviews the author to extract the rule + rationale + evidence, classifies its evidence type, checks it against the existing bank for duplication/supersession, writes the entry, and suggests a review PR as the next step. Use right after a design call, or whenever you want to capture a decision by hand instead of mining PR history.
----
-
 # /greybeard:remember
 
 Capture **one** decision the author already knows, by hand. Complements `/greybeard:learn`
@@ -10,10 +5,10 @@ Capture **one** decision the author already knows, by hand. Complements `/greybe
 `/greybeard:review` later checks future changes against.
 
 The author is the authority here — there is **no adoption check** (a recorded decision may be
-forward-looking, about code that does not exist yet). But the skill still enforces quality: every
+forward-looking, about code that does not exist yet). But the workflow still enforces quality: every
 entry must be **generalizable, carry a "why", be deduped against the bank, and pass a
 review PR.** A sloppy manual entry poisons `review` exactly like a bad mined one — so this
-skill is an interview, not a text box.
+workflow is an interview, not a text box.
 
 ---
 
@@ -35,10 +30,10 @@ If `docs/greybeard/` does not exist yet, create it with an empty `index.md`; sug
 
 ## Inputs (ask only for what's missing)
 
-1. **statement** — the decision, however the author phrases it. Conversational is fine; the skill
+1. **statement** — the decision, however the author phrases it. Conversational is fine; the workflow
    refines it.
 2. **evidence** *(optional)* — a PR/commit/file/doc link, or `tribal: <who told you>`. If absent,
-   the skill asks.
+   the workflow asks.
 3. **category** — pick the **existing** category file whose topic is closest; propose a *new* file
    only if none fits **and** fewer than 5 exist. If 5 already exist and none fits, fold it into the
    nearest one (broaden that category) rather than opening a 6th. Confirm the chosen/new
@@ -48,8 +43,8 @@ If `docs/greybeard/` does not exist yet, create it with an empty `index.md`; sug
 
 ## Flow
 
-Before accepting the author's statement as a decision, read `../decision-candidate.md` and apply
-the shared candidate rules. This skill can rely on the author as the source of truth, but it still
+Before accepting the author's statement as a decision, read `../references/decision-candidate.md` and apply
+the shared candidate rules. This workflow can rely on the author as the source of truth, but it still
 must reject vague, non-generalizable, unevidenced, or non-actionable entries.
 
 ### 1. Interview to fill the gaps (do not store a vague one-liner)
@@ -108,10 +103,10 @@ overturned and why.
 
 ## Decision entry format
 
-Read `../decision-candidate.md` before deciding whether the captured statement is eligible to be
+Read `../references/decision-candidate.md` before deciding whether the captured statement is eligible to be
 stored.
 
-Read `../decision-format.md` before writing or updating entries. That file is the canonical
+Read `../references/decision-format.md` before writing or updating entries. That file is the canonical
 schema shared by `/greybeard:learn`, `/greybeard:remember`, and `/greybeard:review`.
 
 ---
