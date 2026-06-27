@@ -31,7 +31,7 @@ Each skill is an **imperative to the greybeard** — *you* command it to learn, 
 
 ### `review` — one sub-agent per decision file, all in parallel
 
-This is greybeard's core value. Point `/greybeard:review` at a PR, a diff, a document, or any
+Point `/greybeard:review` at a PR, a diff, a document, or any
 change you ask about, and it **spins up one sub-agent for every decision file in `docs/greybeard/`**.
 Each sub-agent owns exactly one file and checks the change *only* against the decisions recorded
 there — matching by **meaning** against the current contents of the changed files, never by line
