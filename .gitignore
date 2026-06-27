@@ -1,0 +1,17 @@
+# Validation artifacts and experiment scaffolding — NOT part of the product.
+# These were used to validate the hypothesis against an internal repo and
+# contain internal data; they must not be published.
+artifacts/
+build_eval.py
+classify.py
+digest.py
+extract_pr_threads.ps1
+score_eval.py
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
