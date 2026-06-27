@@ -49,8 +49,8 @@ it is being judged against.
 `/greybeard:learn` mines your last *N* **merged** PRs — review comments, PR descriptions, and the
 merged diffs — distributing the scan across up to 5 sub-agents. It **verifies every candidate
 against the code that actually shipped** (a reviewer objection that was overruled is *not* a
-decision), clusters the survivors, and opens a review PR with the result. Run it once at setup, or
-re-run in `extend` mode to fold in newer history.
+decision), clusters the survivors, and writes decision files for you to review before any PR action.
+Run it once at setup, or re-run in `extend` mode to fold in newer history.
 
 ### `remember` — capture a decision by hand
 
@@ -73,7 +73,8 @@ docs/greybeard/
 
 Nothing is hardcoded: a token-handling service grows `data-privacy.md`, a UI library grows
 `accessibility.md`. New decisions reuse the closest existing file; a new file appears only when a
-decision fits none — never beyond 5. (`lane` A/B is a per-decision tag, not a folder.)
+decision fits none — never beyond 5. `evidence-type` (`code-verified` or `human-attested`) is a
+per-decision tag, not a folder.
 
 Nothing becomes canon until a human approves the PR. That review gate is the precision backstop.
 

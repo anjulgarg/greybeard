@@ -44,12 +44,12 @@ ORCHESTRATOR
   SUB-AGENT (read-only)   <- one category file + the diff + current contents of changed files
     for each LIVE decision whose SCOPE intersects the changed files:
       does this change move AGAINST the rule?  match by MEANING, not line number
-      emit { decision_id, lane, file, hunk, why, confidence, fix? }  ONLY if high-confidence
+      emit { decision_id, evidenceType, file, hunk, why, confidence, fix? }  ONLY if high-confidence
         |
         | collect all sub-agent findings
         v
   ORCHESTRATOR
-    dedupe, rank (Lane-A violations by confidence first, advisories last),
+    dedupe, rank (code-verified violations by confidence first, advisories last),
     render report  and/or  post PR review comments
 ```
 
@@ -73,13 +73,13 @@ Why per-category-file fan-out:
 
 ---
 
-## Lane handling
+## Evidence-type handling
 
-- **Lane A (code)** — directly checkable. Flag a **violation** when the change moves *against* the
-  rule within its scope.
-- **Lane B (tribal / world fact)** — a diff cannot "violate" a fact. Instead emit an **advisory**
-  when the change touches the fact's subject ("this edits the event hub owned by `<team>` —
-  coordinate?"). Advisory, never a blocking violation.
+- **Code-verified decisions** — directly checkable. Flag a **violation** when the change moves
+  *against* the rule within its scope.
+- **Human-attested facts** — a diff cannot "violate" a fact. Instead emit an **advisory** when the
+  change touches the fact's subject ("this edits the event hub owned by `<team>` — coordinate?").
+  Advisory, never a blocking violation.
 - **Confidence weighting** — `low-needs-attestation` decisions produce **advisories at most**, never
   hard violations (they are unverified by design).
 

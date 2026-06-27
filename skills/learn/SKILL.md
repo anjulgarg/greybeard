@@ -37,8 +37,9 @@ Categories are derived from the decisions, **not** hardcoded. The 5-file cap kee
 `/greybeard:review` fan-out bounded (one sub-agent per category file, ≤5). Bias to the **fewest,
 broadest** buckets that stay coherent: reuse the closest existing file before opening a new one,
 and once 5 exist, fold a new cluster into its nearest neighbour rather than creating a 6th.
-`lane` (A/B) is a per-decision frontmatter tag, independent of which file holds it — world facts
-do not need a file of their own.
+`evidence-type` is a per-decision frontmatter tag, independent of which file holds it. Use
+`code-verified` for rules proven by merged code, and `human-attested` for world facts that code
+cannot prove. Human-attested facts do not need a file of their own.
 
 ---
 
@@ -84,13 +85,13 @@ ORCHESTRATOR (single-threaded, cheap)
              file, release each PR's context before the next (batch size is unbounded)
     Stages 2–4  pre-filter, route, adoption-check (local `git show`, read current files)
     return: structured candidate decisions JSON (id-less), each tagged {mergeSha, mergedAt,
-            lane, verdict, confidence, evidence}. They NEVER write to docs/greybeard/.
+            evidenceType, verdict, confidence, evidence}. They NEVER write to docs/greybeard/.
         |
         |  collect all batch results
         v
   ORCHESTRATOR (single-threaded)
     Stage 5  sort candidates by mergedAt, cluster/dedupe/supersede, assign stable IDs
-    Stage 6  emit docs/greybeard/ files + open review PR
+    Stage 6  emit docs/greybeard/ files, ask user to review, then suggest a PR
 ```
 
 Rules that keep parallelism *correct*, not just fast:
@@ -223,13 +224,15 @@ Expect roughly **~15–20%** of comments to survive this stage. Keep PR-descript
 that clearly assert a generalizable rule + rationale.
 
 ### Stage 3 — Route each surviving candidate — SUB-AGENT, per batch
-- **CODE-asserting** (a convention / logic / config rule about the codebase) → **Lane A**.
-- **WORLD-asserting** (a fact, ownership, or gotcha that no diff can confirm — e.g. "this event
-  hub is owned by the platform team and has 1 consumer group") → **Lane B**.
+- **Code-verified decision** — a convention / logic / config rule about the codebase that the
+  merged diff or current files can prove.
+- **Human-attested fact** — a fact, ownership detail, or gotcha that no diff can confirm — e.g.
+  "this event hub is owned by the platform team and has 1 consumer group". These require a named
+  human attestor and review/expiry date before `review` can trust them.
 
-### Stage 4 — Adoption check (the core — Lane A only) — SUB-AGENT, per batch
-Within its batch, the sub-agent runs this for each Lane-A candidate using the **full context**,
-never just the comment:
+### Stage 4 — Adoption check (the core — code-verified decisions only) — SUB-AGENT, per batch
+Within its batch, the sub-agent runs this for each code-verified candidate using the **full
+context**, never just the comment:
 
 > Inputs: the candidate statement + verbatim quote; the file(s) it concerns; the **merged diff
 > of those files** (`git show <mergeSha> -- <path>`, run locally); and the **final/current
@@ -244,13 +247,14 @@ The sub-agent returns exactly one verdict per candidate:
   ask → **flag for human**, do not auto-canonize. (Real example: a reviewer asked to move a
   param before `CancellationToken`; the team instead kept it after, with a documenting comment.
   The convention is real, but the literal change was not made.)
-- **NOT-CODE** — turns out to assert about the world, not code → reroute to **Lane B**.
+- **NOT-CODE** — turns out to assert about the world, not code → reroute to
+  **human-attested fact**.
 
-Lane B candidates skip the adoption check (a diff cannot confirm them) and instead require, at
+Human-attested facts skip the adoption check (a diff cannot confirm them) and instead require, at
 emit time, a **named human attestor + a review/expiry date**, and are stored at lower confidence.
 
 **Sub-agent output contract:** return a JSON array of candidate decisions — each with
-`{statement, why, scope, lane, verdict, confidence, evidence:{pr, date, quote, mergeSha,
+`{statement, why, scope, evidenceType, verdict, confidence, evidence:{pr, date, quote, mergeSha,
 before, after}}`. `scope` = the file globs / layers the candidate concerned (you just read them in
 the adoption check) — it bounds `review`'s false-fire later. **No stable IDs** (the orchestrator
 assigns those after clustering) and **no writes** to `docs/greybeard/`. A batch that fails or returns
@@ -276,14 +280,20 @@ malformed JSON is retried, or the orchestrator processes it directly.
    - **Tombstone, never delete.** Mark the superseded entry `superseded-by: <id>` + date and
      keep it. History is needed for audit (and contradiction-detection is itself an imperfect
      semantic match — keep the trail).
-   - **Human-confirms every supersession** in the review PR; never apply silently.
+   - **Human-confirms every supersession** during file review or in the eventual review PR; never
+     apply silently.
    - In `extend` mode, dedupe new candidates against the existing `docs/greybeard/` folder; skip
      anything already captured.
 
-### Stage 6 — Emit + human review gate
-Write the category files + `index.md` and open them as a **review PR** (the final precision
-backstop — nothing becomes canon until a human approves). In the PR description, flag every
-**Lane-B** and **PARTIAL** entry as "needs attestation / needs decision."
+### Stage 6 — Emit + user review gate
+Write the category files + `index.md`, then **stop and ask the user to review the generated
+decision files before taking any PR action**. Report where the files were written and flag every
+**human-attested fact** and **PARTIAL** entry as "needs attestation / needs decision."
+
+Do **not** create a PR automatically. After the user reviews the files and says there are no
+concerns, suggest creating a normal review PR as the final precision backstop. Only create that PR
+if the user explicitly approves. If a PR is created, flag every **human-attested fact** and
+**PARTIAL** entry in the PR description.
 
 ---
 
@@ -293,8 +303,8 @@ Record a `confidence` per decision, ranked by evidence strength:
 1. **High** — contested in review **and** adopted in the merged code (two parties + code proof).
 2. **Medium** — stated in the PR description **and** corroborated by the merged code (single
    party, but the code shipped).
-3. **Low / needs-attestation** — Lane B (world facts), or Stage-4 PARTIAL. Requires a human
-   attestor + expiry before it is trusted by `review`.
+3. **Low / needs-attestation** — human-attested facts (world facts), or Stage-4 PARTIAL. Requires
+   a human attestor + expiry before it is trusted by `review`.
 
 (A comment that was **NOT adopted** is not low-confidence — it is **dropped**.)
 
@@ -308,14 +318,14 @@ Each decision in a category file:
 ### <ID>. <one-line imperative statement of the rule>
 <1–3 sentence elaboration, including the WHY.>
 
-- lane: A | B
+- evidence-type: code-verified | human-attested
 - confidence: high | medium | low-needs-attestation
 - evidence:
   - PR <N> (<date>) — "<verbatim reviewer quote or description excerpt>"
   - merge: <sha> — before: `<old snippet>` → after: `<new snippet>`
 - scope: <services / layers / file globs the rule applies to>
 - volatility: low | med | high   reuse-value: low | med | high
-- attestor: <alias>  review-by: <date>      # Lane B / PARTIAL only
+- attestor: <alias>  review-by: <date>      # human-attested / PARTIAL only
 - superseded-by: <ID> (<date>)              # only if tombstoned
 ```
 
@@ -341,4 +351,6 @@ Each decision in a category file:
 ## Output summary to the user
 
 After the run, report: PRs scanned, candidates after pre-filter, ADOPTED / DROPPED / PARTIAL /
-Lane-B counts, number of clustered decisions emitted, and the link to the review PR.
+human-attested fact counts, number of clustered decisions emitted, and the path to the generated
+`docs/greybeard/` files. Ask the user to review those files. Only include a review PR link if the
+user already approved PR creation in a later step.

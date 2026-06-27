@@ -1,6 +1,6 @@
 ---
 name: remember
-description: Manually record ONE engineering decision into the project's decision memory (docs/greybeard/). Interviews the author to extract the rule + rationale + scope + evidence, classifies its lane, checks it against the existing bank for duplication/supersession, writes the entry, and opens a review PR. Use right after a design call, or whenever you want to capture a decision by hand instead of mining PR history.
+description: Manually record ONE engineering decision into the project's decision memory (docs/greybeard/). Interviews the author to extract the rule + rationale + scope + evidence, classifies its evidence type, checks it against the existing bank for duplication/supersession, writes the entry, and opens a review PR. Use right after a design call, or whenever you want to capture a decision by hand instead of mining PR history.
 ---
 
 # /greybeard:remember
@@ -58,15 +58,15 @@ Extract four things; ask only for what the author has not already given:
 - **Scope** — where it applies (which services / layers / file globs). This is what stops
   `review` from flagging conformant code elsewhere. Over-broad scope is the #1 way a manual
   entry causes false alarms.
-- **Evidence** — what backs it (drives the lane, below).
+- **Evidence** — what backs it (drives the evidence type, below).
 
-### 2. Route the lane
-- **Lane A — code-asserting** (a convention / logic / config rule). Evidence = a PR/commit/file
+### 2. Route the evidence type
+- **Code-verified decision** — a convention / logic / config rule. Evidence = a PR/commit/file
   that demonstrates it, or an explicit "go-forward, no code yet."
-- **Lane B — world fact** (ownership, a gotcha, a non-obvious fact no diff can confirm — e.g.
-  "this event hub is owned by the platform team, 1 consumer group"). **Requires a named attestor +
+- **Human-attested fact** — ownership, a gotcha, or a non-obvious fact no diff can confirm — e.g.
+  "this event hub is owned by the platform team, 1 consumer group". **Requires a named attestor +
   a review-by/expiry date**, stored at lower confidence. A world fact with no human owner rots and
-  there is no diff to re-verify it — so Lane B without an attestor is rejected.
+  there is no diff to re-verify it — so human-attested facts without an attestor are rejected.
 
 ### 3. Coherence check against the existing bank (read `index.md`, then the category file)
 Before writing, compare the new decision to what is already recorded:
@@ -82,7 +82,7 @@ Before writing, compare the new decision to what is already recorded:
 - **New / coexisting** — assign the next stable ID in the category.
 
 > Note: do **not** run learn's adoption check — the author, not a merged diff, is the source
-> of truth. But if the **current code visibly contradicts** a Lane-A go-forward rule, surface that
+> of truth. But if the **current code visibly contradicts** a code-verified go-forward rule, surface that
 > as an FYI so the author records the decision knowingly (and can file the follow-up to fix code).
 
 ### 4. Draft the entry + write it
@@ -90,13 +90,13 @@ Render in the standard entry format (below). Append to the right category file, 
 line, and set confidence:
 - **high** — author + concrete code/PR evidence.
 - **medium** — author assertion; evidence thin or forward-looking.
-- **low-needs-attestation** — Lane B, or any entry whose why/evidence the author could not fully pin
-  down.
+- **low-needs-attestation** — human-attested facts, or any entry whose why/evidence the author
+  could not fully pin down.
 
 ### 5. Open a review PR
 Same human gate as learn — nothing becomes canon until a teammate approves. In the PR body,
-surface the **lane**, the **confidence**, and **any supersession this triggers** (so the reviewer
-sees exactly what is being overturned and why).
+surface the **evidence type**, the **confidence**, and **any supersession this triggers** (so the
+reviewer sees exactly what is being overturned and why).
 
 ---
 
@@ -106,14 +106,14 @@ sees exactly what is being overturned and why).
 ### <ID>. <one-line imperative statement of the rule>
 <1–3 sentence elaboration, including the WHY.>
 
-- lane: A | B
+- evidence-type: code-verified | human-attested
 - confidence: high | medium | low-needs-attestation
 - evidence:
   - PR <N> (<date>) — "<verbatim quote or author's stated rationale>"
   - <commit/file/doc pointer, if any>
 - scope: <services / layers / file globs the rule applies to>
 - volatility: low | med | high   reuse-value: low | med | high
-- attestor: <alias>  review-by: <date>      # Lane B only (required)
+- attestor: <alias>  review-by: <date>      # human-attested only (required)
 - superseded-by: <ID> (<date>)              # only if tombstoned
 ```
 
@@ -128,7 +128,7 @@ sees exactly what is being overturned and why).
 2. **Scope it tightly.** An over-broad rule makes `review` flag conformant code — the precision
    failure that destroys trust in the whole system.
 3. **Never silently overwrite a contradicting decision.** Tombstone + human-confirm; keep the trail.
-4. **Lane B without attestor + expiry is forbidden.** There is no diff to re-verify a world fact, so
-   it needs a human owner and a refresh date.
+4. **Human-attested facts without attestor + expiry are forbidden.** There is no diff to re-verify a
+   world fact, so it needs a human owner and a refresh date.
 5. **One decision per run.** If the author rattles off several, capture them one at a time so each
    gets a real interview — batch capture is what `/greybeard:learn` is for.
