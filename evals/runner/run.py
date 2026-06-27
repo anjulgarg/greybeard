@@ -3,14 +3,17 @@
 
 Runs the MVP tiers:
 
-* Tier 0 - format linter (deterministic; gates CI).
-* Tier 1 - candidate-bar eval (LLM-backed; skipped without a provider).
-* Tier 2 - review classification eval (LLM-backed; skipped without a provider).
+* Tier 0 - format linter (deterministic; **gates CI**).
+* Tier 1 / Tier 2 - LLM-backed, but **harness-driven** (advisory, never gate CI).
 
 Tier 0 is the CI gate: ``bank-a`` must pass clean and ``bank-broken`` must
-produce exactly the error set in its ``expected-errors.json``. The LLM tiers run
-only when ``GREYBEARD_EVAL_PROVIDER`` is configured; otherwise they report
-``skipped`` so CI is never blocked on a model judge or on network access.
+produce exactly the error set in its ``expected-errors.json``.
+
+The LLM tiers are no longer scored by a model provider inside Python. A coding
+harness runs the runbooks ``evals/tier1.md`` / ``evals/tier2.md`` and writes its
+verdicts to ``evals/out/``; ``score.py`` grades them. This runner invokes that
+scorer for whatever harness results are present (reporting ``skipped`` for any
+tier with no results file), so CI is never blocked on a model judge or network.
 
 Usage:
     python evals/runner/run.py [--update-baseline] [--json]
@@ -28,9 +31,8 @@ from pathlib import Path
 # Allow importing sibling modules whether invoked as a script or a module.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import score  # noqa: E402
 import tier0_format_lint as tier0  # noqa: E402
-import tier1_candidate_eval as tier1  # noqa: E402
-import tier2_review_eval as tier2  # noqa: E402
 from load_skill_files import load_skill_files  # noqa: E402
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
@@ -39,8 +41,6 @@ BASELINES = EVALS_ROOT / "baselines" / "metrics.json"
 
 BANK_A = FIXTURES / "review" / "bank-a"
 BANK_BROKEN = FIXTURES / "review" / "bank-broken"
-CANDIDATE_CASES = FIXTURES / "candidate" / "cases.jsonl"
-REVIEW_CASES = FIXTURES / "review" / "cases"
 
 
 def _error_key_set(errors):
@@ -97,11 +97,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     # Loading the real shipped skill files up front fails loudly if any moved.
-    skill_files = load_skill_files()
+    load_skill_files()
 
     tier0_summary, tier0_ok = run_tier0()
-    tier1_summary = tier1.evaluate(CANDIDATE_CASES, skill_files=skill_files)
-    tier2_summary = tier2.evaluate(REVIEW_CASES, skill_files=skill_files)
+    tier1_summary = score.score_tier1()
+    tier2_summary = score.score_tier2()
 
     results = {
         "tier0": tier0_summary,
@@ -115,28 +115,27 @@ def main(argv=None):
     print(f"[tier0] format lint: {'PASS' if tier0_ok else 'FAIL'}")
     for c in tier0_summary["checks"]:
         print(f"        - {'ok ' if c['ok'] else 'FAIL'} {c['name']}")
-    for key, summary in (("tier1", tier1_summary), ("tier2", tier2_summary)):
-        m = summary["metrics"]
-        if not summary["ran"]:
-            print(
-                f"[{key}] {summary['tier']}: SKIPPED "
-                f"({m['total']} cases, no model provider configured)"
-            )
-        else:
-            print(
-                f"[{key}] {summary['tier']}: scored {m['scored']}/{m['total']} "
-                f"accuracy={m['accuracy']} false_alarm_rate={m['falseAlarmRate']} "
-                f"precision={m['precision']} recall={m['recall']}"
-            )
+    score._print_tier("tier1", tier1_summary)
+    score._print_tier("tier2", tier2_summary)
+    if not (tier1_summary["ran"] and tier2_summary["ran"]):
+        print(
+            "        (LLM tiers are harness-driven: run evals/tier1.md and "
+            "evals/tier2.md with any harness, then re-run to score)"
+        )
 
     if args.json:
         print(json.dumps(results, indent=2))
 
     if args.update_baseline:
         baseline = {
-            "tier0": {"ok": tier0_ok, "bankBrokenErrorCount": tier0_summary["bankBrokenErrorCount"]},
+            "tier0": {
+                "ok": tier0_ok,
+                "bankBrokenErrorCount": tier0_summary["bankBrokenErrorCount"],
+            },
             "tier1": tier1_summary["metrics"],
+            "tier1Provenance": tier1_summary["provenance"],
             "tier2": tier2_summary["metrics"],
+            "tier2Provenance": tier2_summary["provenance"],
         }
         BASELINES.write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")
         print(f"\nWrote baseline to {BASELINES.relative_to(EVALS_ROOT.parent)}")

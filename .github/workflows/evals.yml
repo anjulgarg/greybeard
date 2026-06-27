@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: "3.12"
       # Tier 0 is deterministic and gates this job. Tiers 1 and 2 are LLM-backed
-      # and skip automatically (no GREYBEARD_EVAL_PROVIDER), so CI needs no model
-      # judge and no network access.
+      # and harness-driven: with no harness results in evals/out/ they report
+      # skipped, so CI needs no model judge and no network access.
       - name: Run Greybeard eval harness
         run: python evals/runner/run.py
