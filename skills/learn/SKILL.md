@@ -39,7 +39,8 @@ broadest** buckets that stay coherent: reuse the closest existing file before op
 and once 5 exist, fold a new cluster into its nearest neighbour rather than creating a 6th.
 `evidence-type` is a per-decision frontmatter tag, independent of which file holds it. Use
 `code-verified` for rules proven by merged code, and `human-attested` for world facts that code
-cannot prove. Human-attested facts do not need a file of their own.
+cannot prove. Only `code-verified` decisions with an `ADOPTED` verdict are emitted into the final
+decision files; human-attested facts are review notes, not canon.
 
 ---
 
@@ -228,7 +229,7 @@ that clearly assert a generalizable rule + rationale.
   merged diff or current files can prove.
 - **Human-attested fact** — a fact, ownership detail, or gotcha that no diff can confirm — e.g.
   "this event hub is owned by the platform team and has 1 consumer group". These require a named
-  human attestor and review/expiry date before `review` can trust them.
+  human attestor before they can be considered, but `/learn` does **not** emit them as decisions.
 
 ### Stage 4 — Adoption check (the core — code-verified decisions only) — SUB-AGENT, per batch
 Within its batch, the sub-agent runs this for each code-verified candidate using the **full
@@ -244,36 +245,50 @@ The sub-agent returns exactly one verdict per candidate:
 - **NOT-ADOPTED** — the merged code did *not* change as the comment asked (or did the opposite)
   → **DROP**. (This is the gate that kills the inverted-sampling failure.)
 - **PARTIAL** — partly adopted, or adopted as a *documented deviation* rather than the literal
-  ask → **flag for human**, do not auto-canonize. (Real example: a reviewer asked to move a
+  ask → **flag for human**, do not emit as a decision. (Real example: a reviewer asked to move a
   param before `CancellationToken`; the team instead kept it after, with a documenting comment.
   The convention is real, but the literal change was not made.)
 - **NOT-CODE** — turns out to assert about the world, not code → reroute to
   **human-attested fact**.
 
-Human-attested facts skip the adoption check (a diff cannot confirm them) and instead require, at
-emit time, a **named human attestor + a review/expiry date**, and are stored at lower confidence.
+Human-attested facts skip the adoption check because a diff cannot confirm them. They may be
+reported separately as "not emitted / needs human follow-up", but they are not emitted as decisions
+by `/learn`.
 
 **Sub-agent output contract:** return a JSON array of candidate decisions — each with
-`{statement, why, scope, evidenceType, verdict, confidence, evidence:{pr, date, quote, mergeSha,
-before, after}}`. `scope` = the file globs / layers the candidate concerned (you just read them in
-the adoption check) — it bounds `review`'s false-fire later. **No stable IDs** (the orchestrator
-assigns those after clustering) and **no writes** to `docs/greybeard/`. A batch that fails or returns
-malformed JSON is retried, or the orchestrator processes it directly.
+`{statement, why, futureBenefit, reviewCheck, scope, evidenceType, verdict, confidence,
+evidence:{pr, date, quote, mergeSha, before, after}}`. `futureBenefit` must clearly explain how
+this decision helps future engineers make better decisions in this project; it must be articulate,
+specific, and grounded in project reality (not generic "improves maintainability" filler).
+`reviewCheck` must state what reviewers should check in future PRs to apply this decision — concrete
+evidence, code/config shape, test coverage, rollout boundary, or operational proof to ask for. `scope`
+= the file globs / layers the candidate concerned (you just read them in the adoption check) — it
+bounds `review`'s false-fire later. The `mergeSha`, `before`, and `after` fields are internal
+adoption-check proof only; use them during reduce/review, but do not emit before/after proof into the
+final decision markdown. **No stable IDs** (the orchestrator assigns those after clustering) and **no
+writes** to `docs/greybeard/`. A batch that fails or returns malformed JSON is retried, or the
+orchestrator processes it directly.
 
 ### Stage 5 — Reduce: sort, cluster, dedupe, supersede — ORCHESTRATOR
 0. **Sort the merged candidate pool by `mergedAt` (oldest → newest).** Supersession is applied in
    this order — *here in the reduce*, not by PR processing order — which is what makes the
    parallel map safe.
-1. **Cluster recurring decisions** into a single entry with multiple evidence cites. Recurrence
+1. **Filter final decisions to only ADOPTED code-verified candidates.** Human-attested facts,
+   PARTIAL candidates, NOT-CODE candidates, and NOT-ADOPTED candidates are not emitted as decisions.
+   Count them in the run summary as "not emitted / needs human follow-up" where useful, but keep the
+   canonical decision files clean.
+2. **Cluster recurring decisions** into a single entry with multiple evidence cites. Recurrence
    (same guidance re-litigated across PRs/reviewers) is a strong **confidence booster** — record
    every occurrence. (Real example: a "safer defaults" config rule recurred across 3 PRs over 3
-   months — exactly the repeated cost a decision memory removes.)
-2. **Group into ≤5 category files and assign stable IDs.** Derive emergent topic buckets from the
+   months — exactly the repeated cost a decision memory removes.) When clustering, preserve or
+   synthesize one clear `futureBenefit` and one actionable `reviewCheck` for the clustered decision
+   from the strongest evidence.
+3. **Group into ≤5 category files and assign stable IDs.** Derive emergent topic buckets from the
    clustered decisions (not a fixed list); choose the **fewest, broadest** files that stay coherent,
    hard-capped at **5** — if a 6th topic appears, fold it into its nearest neighbour and broaden
    that file's scope. ID = a short prefix from the topic + a number (e.g. `testing` → `T1`,
    `api-compat` → `A1`), stable thereafter.
-3. **Supersession (recency wins), handled carefully:**
+4. **Supersession (recency wins), handled carefully:**
    - Distinguish three cases: **supersede** (same scope, new value — e.g. default 10s → 20s),
      **coexist** (different scope — a rule for service A vs service B), and **false
      contradiction** (the semantic match was wrong). Only *supersede* replaces.
@@ -287,26 +302,23 @@ malformed JSON is retried, or the orchestrator processes it directly.
 
 ### Stage 6 — Emit + user review gate
 Write the category files + `index.md`, then **stop and ask the user to review the generated
-decision files before taking any PR action**. Report where the files were written and flag every
-**human-attested fact** and **PARTIAL** entry as "needs attestation / needs decision."
+decision files before taking any PR action**. Report where the files were written and report counts
+for candidates not emitted because they were human-attested, PARTIAL, NOT-CODE, or NOT-ADOPTED.
 
 Do **not** create a PR automatically. After the user reviews the files and says there are no
 concerns, suggest creating a normal review PR as the final precision backstop. Only create that PR
-if the user explicitly approves. If a PR is created, flag every **human-attested fact** and
-**PARTIAL** entry in the PR description.
+if the user explicitly approves.
 
 ---
 
 ## Confidence ranking
 
-Record a `confidence` per decision, ranked by evidence strength:
+Record a `confidence` per emitted decision, ranked by evidence strength:
 1. **High** — contested in review **and** adopted in the merged code (two parties + code proof).
 2. **Medium** — stated in the PR description **and** corroborated by the merged code (single
    party, but the code shipped).
-3. **Low / needs-attestation** — human-attested facts (world facts), or Stage-4 PARTIAL. Requires
-   a human attestor + expiry before it is trusted by `review`.
-
-(A comment that was **NOT adopted** is not low-confidence — it is **dropped**.)
+Do not emit low-confidence decisions. Human-attested facts, PARTIAL candidates, and NOT-ADOPTED
+comments are not low-confidence canon; they are excluded from the final decision files.
 
 ---
 
@@ -318,18 +330,30 @@ Each decision in a category file:
 ### <ID>. <one-line imperative statement of the rule>
 <1–3 sentence elaboration, including the WHY.>
 
-- evidence-type: code-verified | human-attested
-- confidence: high | medium | low-needs-attestation
+**Future benefit:** <1–2 sentences explaining how this decision helps future engineers make better
+decisions in this project, grounded in the actual service/config/test/operational reality.>
+
+**Review check:** <1 sentence telling reviewers exactly what to check in future PRs to apply this
+decision, such as required evidence, code/config shape, tests, rollout scope, or operational proof.>
+
+- evidence-type: code-verified
+- confidence: high | medium
 - evidence:
   - PR <N> (<date>) — "<verbatim reviewer quote or description excerpt>"
-  - merge: <sha> — before: `<old snippet>` → after: `<new snippet>`
 - scope: <services / layers / file globs the rule applies to>
 - volatility: low | med | high   reuse-value: low | med | high
-- attestor: <alias>  review-by: <date>      # human-attested / PARTIAL only
 - superseded-by: <ID> (<date>)              # only if tombstoned
 ```
 
 `index.md` carries one line per decision: `- <ID> (<file>) — <one-line statement> [conf]`.
+
+Every decision entry must include a **Future benefit** paragraph. If you cannot write a clear,
+project-grounded future benefit for a candidate, drop it or flag it for human review instead of
+canonizing it.
+
+Every decision entry must also include a **Review check** paragraph. If you cannot state a concrete
+review action, the decision is probably too vague for `review` to use safely; drop it or flag it for
+human review.
 
 ---
 
@@ -350,22 +374,27 @@ Each decision in a category file:
 
 ## Output summary to the user
 
-After the run, report: PRs scanned, candidates after pre-filter, ADOPTED / DROPPED / PARTIAL /
-human-attested fact counts, number of clustered decisions emitted, and the path to the generated
-`docs/greybeard/` files. Also list each generated markdown file with its decision count so the user
-knows what to review, e.g.:
+After the run, report: PRs scanned, candidates after pre-filter, emitted ADOPTED code-verified
+decision count, not-emitted counts (NOT-ADOPTED, PARTIAL, human-attested / NOT-CODE), and the path
+to the generated `docs/greybeard/` files. Also list each generated markdown file with its decision
+count so the user knows what to review, e.g.:
 
 ```text
 Generated Greybeard decision docs in:
 <repo>\docs\greybeard\
 
 Files created:
-- index.md — 52 decisions indexed
+- index.md — 49 decisions indexed
 - auth-api.md — 9 decisions
-- infrastructure-config.md — 15 decisions
+- infrastructure-config.md — 13 decisions
 - observability.md — 10 decisions
-- testing-synthetics.md — 15 decisions
+- testing-synthetics.md — 14 decisions
 - data-operations.md — 3 decisions
+
+Not emitted:
+- NOT-ADOPTED — 0
+- PARTIAL — 1
+- human-attested / NOT-CODE — 2
 ```
 
 Ask the user to review those files. Only include a review PR link if the user already approved PR
