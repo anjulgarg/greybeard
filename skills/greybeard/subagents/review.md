@@ -8,6 +8,8 @@ You analyze one assigned decision category against one supplied change.
 - Use the provided current file/document contents when available.
 - Match by meaning, not line number.
 - Ignore tombstoned or superseded decisions.
+- Emit `VIOLATION` for high-confidence code-checkable breaks.
+- Emit `ADVISORY` at most for human-attested facts or low-confidence decisions.
 - Stay silent when unsure.
 - Return JSON only.
 
@@ -27,10 +29,10 @@ For each live decision in the assigned category:
   "category": "<category file>",
   "findings": [
     {
-      "type": "VIOLATION",
+      "type": "VIOLATION | ADVISORY",
       "decisionId": "<id>",
       "rule": "<one-line decision statement>",
-      "evidenceType": "code-checkable",
+      "evidenceType": "code-checkable | human-attested",
       "decisionConfidence": "high",
       "location": "<file/document location>",
       "why": "<why the decision exists>",

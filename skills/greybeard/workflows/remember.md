@@ -5,7 +5,7 @@ Capture **one** decision the author already knows, by hand. Complements `/greybe
 `/greybeard:review` later checks future changes against.
 
 The author is the authority here — there is **no adoption check** (a recorded decision may be
-forward-looking, about code that does not exist yet). But the workflow still enforces quality: every
+forward-looking, about code that does not exist yet). But the workflow still requires quality: every
 entry must be **generalizable, carry a "why", be deduped against the bank, and pass a
 review PR.** A sloppy manual entry poisons `review` exactly like a bad mined one — so this
 workflow is an interview, not a text box.
@@ -14,8 +14,8 @@ workflow is an interview, not a text box.
 
 ## Where decisions are stored
 
-The same `docs/greybeard/` folder on the **main branch**, updated via normal PRs. Only `index.md`
-is fixed; category files are **emergent and capped at 5**, named for what they cover:
+The same `docs/greybeard/` folder, intended for the main branch through normal PR review. Only
+`index.md` is fixed; category files are **emergent and capped at 5**, named for what they cover:
 
 ```
 docs/greybeard/

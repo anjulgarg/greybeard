@@ -3,12 +3,10 @@
 The payoff of the decision memory. Given a PR, diff, branch, local change set, document, or other
 supplied change, surface changes that break a recorded decision — **with the rule, why it exists,
 and the original evidence** — so the author fixes it before merge instead of a reviewer re-deriving
-the rule from scratch (again).
+the rule from scratch again.
 
-Validated at **86% / 75% / 12%** on the calibration repo (strict recall / zero-overlap recall /
-false-alarm rate). The **12% false-alarm number is the one to protect: precision over recall.** A
-wrong flag on conformant code teaches people to ignore the tool, which destroys the whole system's
-value. **When a sub-agent is unsure, it stays silent.**
+This workflow is precision-biased. A wrong flag on conformant code teaches people to ignore the
+tool, which destroys the system's value. **When a sub-agent is unsure, it stays silent.**
 
 ---
 
@@ -31,7 +29,8 @@ Before fanning out, read `../subagents/review.md` and use it as the system instr
 every category-checking sub-agent.
 
 Unlike learn (which partitions *PRs*), here the natural unit is the **decision category file**.
-They are few (**≤5**, enforced at write time by learn/remember) and independent, so fan-out is naturally bounded — at most 5 sub-agents, no streaming needed.
+They are few (**≤5**, kept bounded by learn/remember) and independent, so fan-out is naturally
+bounded — at most 5 sub-agents, no streaming needed.
 
 ```
 ORCHESTRATOR
@@ -49,11 +48,11 @@ ORCHESTRATOR
         v
   ORCHESTRATOR
     dedupe, rank (code-checkable violations by decision confidence first, advisories last),
-    render report  and/or  post PR review comments
+    render report; post PR review comments only if explicitly requested
 ```
 
 Why per-category-file fan-out:
-- **Bounded** by category count (**≤5**, enforced when decisions are written) — no extra concurrency cap or streaming required. If one category
+- **Bounded** by category count (**≤5**, kept bounded when decisions are written) — no extra concurrency cap or streaming required. If one category
   file holds an unusually large number of decisions, that sub-agent walks them decision-by-decision.
 - **Tight context** — each sub-agent sees one category's rules + the supplied change, nothing else.
 - **Single final output** — sub-agents may write scratch findings, but only the orchestrator emits
@@ -94,7 +93,7 @@ Why per-category-file fan-out:
 
 ## Output
 
-A report, and optionally PR review comments. Per finding:
+A report by default. Post PR review comments only when the user explicitly asks. Per finding:
 
 ```
 [VIOLATION | ADVISORY]  <decision_id>  (<category>)  decision-conf:<high|medium|low>

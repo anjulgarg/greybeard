@@ -9,14 +9,14 @@
 </p>
 
 <p align="center">
-  Every commit. Every decision. Every lesson. Remembered.
+  Every decision. Every lesson. Remembered when it matters.
 </p>
 
 **greybeard** is a **decision-memory** for your codebase. It captures the durable engineering
 decisions that normally live only in a senior engineer's head — the conventions, the hard-won
 "we tried that and it broke," the "always do X because Y" — and stores them as markdown files
-that evolve with your repo, gated through PR review, so they survive turnover and get **enforced**
-on new changes.
+that evolve with your repo, gated through PR review, so they survive turnover and get checked
+against new changes.
 
 ## Why
 
@@ -26,7 +26,7 @@ Most engineering knowledge evaporates the moment it's created:
 - A team agrees on a retry convention… then re-litigates it three PRs later.
 - The one person who knew who owns that event hub leaves.
 
-greybeard turns that ephemeral knowledge into a queryable, enforceable bank.
+greybeard turns that ephemeral knowledge into a queryable decision bank.
 
 ## The three workflows
 
@@ -75,9 +75,9 @@ evaporates.
 
 ## How decisions are stored
 
-A `docs/greybeard/` folder on your main branch, updated through normal PRs. Only `index.md` is
-fixed — the category files are **emergent and capped at 5**, named for whatever your codebase
-actually cares about:
+A `docs/greybeard/` folder, intended for your main branch through normal PR review. Only
+`index.md` is fixed — the category files are **emergent and capped at 5**, named for whatever your
+codebase actually cares about:
 
 ```
 docs/greybeard/

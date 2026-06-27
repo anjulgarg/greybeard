@@ -24,7 +24,7 @@ This file owns orchestration only. Do not duplicate candidate rules here.
 
 ## Where decisions are stored
 
-Write decisions to `docs/greybeard/` on the main branch:
+Write decisions to `docs/greybeard/`, intended for the main branch through normal PR review:
 
 ```text
 docs/greybeard/

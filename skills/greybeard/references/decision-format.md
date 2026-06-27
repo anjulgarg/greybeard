@@ -20,8 +20,8 @@ operational proof, or coordination to ask for.>
 - evidence-type: code-checkable | human-attested
 - confidence: high | medium | low
 - evidence:
-  - PR <N> (<date>) - "<verbatim reviewer quote or description excerpt>"
-  - <commit/file/doc pointer, if any>
+  - <source pointer> - "<verbatim quote or concise source summary>"
+  - <commit/file/doc/author/attestor pointer, if any>
 - attestor: <alias>                         # human-attested only (required)
 - superseded-by: <ID> (<date>)              # only if tombstoned
 ```
@@ -40,5 +40,7 @@ Rules:
   the decision is too vague for `review`.
 - `evidence-type` and `confidence` are entry fields, not file-level frontmatter.
 - Human-attested entries require `attestor`.
+- Evidence may come from a PR, commit, file, document, named author/source, or named attestor. Do not
+  force manual or human-attested entries into a PR-shaped citation.
 - Do not store a separate applicability field. Relevance is judged semantically from the decision
   text, category, evidence, and changed content.
