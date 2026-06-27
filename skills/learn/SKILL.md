@@ -44,7 +44,15 @@ do not need a file of their own.
 
 ## Inputs (ask the user if not provided)
 
-1. **X** — number of most-recent merged PRs to scan (default **100**).
+1. **X** — number of most-recent merged PRs to scan. **Always ask the user** how many PRs the
+   skill should run on before scanning — never silently assume a default. Present sensible choices:
+   - **Last 100 PRs** (default if the user just wants a quick bootstrap)
+   - **All PRs over the last 1 year** (a `window` of the past 12 months, any count)
+   - **From the beginning of the project** (every merged PR in history)
+   - **Custom** — a specific number of PRs or a specific date range the user provides
+   Map the chosen option onto `X` and/or `window` (item 3): a count-based choice sets `X`; a
+   time-based choice ("last 1 year", "from the beginning") sets `window` and leaves `X` effectively
+   unbounded (use a high `--limit` and let the date range bound the scan).
 2. **provider** — `github` (`gh` CLI) or `azure-devops` (`az repos`/`az devops invoke`). Auto-detect
    from the remote if possible.
 3. **window** — optional date range to bound the scan.
@@ -153,10 +161,12 @@ in; very small repos (`N ≲ 10`) → skip fan-out, run inline.
 ## Pipeline (6 stages, map-reduce)
 
 ### Stage 0 — Enumerate eligible PRs, confirm scope, split into batches (ORCHESTRATOR)
-First **count the merged PRs actually available**, then confirm scope with the user before
-fanning out — `X` is meaningless if only 60 merged PRs exist, or if 500 exist and the user may
-only want a recent slice. Report: total merged PRs available, the slice to be scanned, and the
-resulting batch/sub-agent count.
+First **count the merged PRs actually available**, then **always ask the user how many PRs to scan**
+before fanning out — `X` is meaningless if only 60 merged PRs exist, or if 500 exist and the user may
+only want a recent slice. Offer the standard choices (**last 100 PRs**, **all PRs over the last 1
+year**, **from the beginning of the project**, or a **custom** count/date range — see **Inputs**),
+then report: total merged PRs available, the slice to be scanned, and the resulting batch/sub-agent
+count.
 
 This stage is **cheap**: one bulk *list* call that returns PR refs (`number`, `mergeCommit`,
 `mergedAt`, `title`) — it does **not** fetch comment threads (that is the sub-agent's job).
