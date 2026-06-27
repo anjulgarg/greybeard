@@ -134,6 +134,12 @@ Adoption verdicts:
 - **NOT-CODE** - the item is a world fact or non-code claim. Route as human-attested; `/learn` does
   not emit it.
 
+Mined confidence:
+
+- **high** - contested in review and adopted in the merged code.
+- **medium** - stated in the PR description and corroborated by the merged code.
+- **low** - do not emit from `/learn`; report only in not-emitted counts where useful.
+
 ---
 
 ## Remember-Specific Rules

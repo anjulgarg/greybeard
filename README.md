@@ -91,9 +91,10 @@ decision fits none — never beyond 5. `evidence-type` (`code-checkable` or `hum
 per-decision entry field, not a folder or frontmatter.
 
 The canonical candidate rules live in `skills/decision-candidate.md`; `learn` sub-agents and
-`remember` use that file instead of duplicating the decision-identification rules. The canonical
-entry schema lives in `skills/decision-format.md`; `learn`, `remember`, and `review`
-reference that file instead of duplicating the format.
+`remember` use that file instead of duplicating the decision-identification rules.
+`skills/learn/subagent.md` contains the system instructions for `learn` PR-scanning
+sub-agents. The canonical entry schema lives in `skills/decision-format.md`; `learn`, `remember`,
+and `review` reference that file instead of duplicating the format.
 
 Nothing becomes canon until a human approves the PR. That review gate is the precision backstop.
 

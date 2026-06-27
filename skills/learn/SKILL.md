@@ -61,8 +61,8 @@ decision files; human-attested facts are review notes, not canon.
 3. **window** — optional date range to bound the scan.
 4. **mode** — `bootstrap` (empty `docs/greybeard/`) or `extend` (dedupe against existing decisions).
 5. **max sub-agents** — hard cap on the **total** number of sub-agents the scan spawns, for the
-   whole run (default & max **5**). Use fewer or run inline when that is simpler.
-6. **large-scan warning threshold** — comment-threads *per sub-agent* above which the run is
+   whole run (default & max **5**). Use fewer when that is simpler.
+6. **large-scan warning threshold** — comment-thread load *per planned worker/batch* above which the run is
    flagged as large and slow (default **~250**). It does not add agents (the cap is 5); it prompts
    the user to lower **X** or narrow the **window** instead.
 
@@ -118,9 +118,9 @@ Rules that keep parallelism *correct*, not just fast:
 
 ## Sizing: how many sub-agents
 
-Use **at most 5 sub-agents for the entire scan**. The orchestrator chooses the simplest useful
-strategy: run inline for tiny scans, use fewer agents for small scans, and use up to 5 agents when
-parallelism will materially help. Do not spawn idle agents just to reach the cap.
+Use **at most 5 sub-agents for the entire scan**. PR scanning always happens through sub-agents:
+use one sub-agent for tiny scans, fewer agents for small scans, and up to 5 agents when parallelism
+will materially help. Do not spawn idle agents just to reach the cap.
 
 **Put every selected merged PR in exactly one batch.** Do not special-case PRs with zero comments:
 their descriptions can still contain decisions. If comment/thread counts are already available
@@ -138,7 +138,7 @@ exceeds the **large-scan warning threshold** (default ~250 threads/agent), the o
 **window**.
 
 **Worked examples:**
-- **8 PRs selected:** likely run inline.
+- **8 PRs selected:** use one sub-agent.
 - **46 PRs selected:** use a few work-balanced batches if parallel fetch will help.
 - **1000 PRs selected:** use up to 5 batches; warn if the known thread load exceeds the guardrail
   and offer to narrow the scan.
@@ -147,10 +147,11 @@ exceeds the **large-scan warning threshold** (default ~250 threads/agent), the o
 
 ## Pipeline (6 stages, map-reduce)
 
-Before starting Stage 1, read `../decision-candidate.md`. That file is the canonical source for
-what counts as a decision candidate, what must be dropped, evidence routing, and adoption verdicts.
-Every sub-agent must receive and apply those rules. This skill owns orchestration; the shared file
-owns candidate judgment.
+Before starting Stage 1, read `../decision-candidate.md` and `subagent.md`.
+`decision-candidate.md` is the canonical source for what counts as a decision candidate, what must
+be dropped, evidence routing, and adoption verdicts. `subagent.md` is the system instruction set for
+every PR-scanning sub-agent. This skill owns orchestration; the shared files own candidate judgment
+and sub-agent behavior.
 
 ### Stage 0 — Enumerate eligible PRs, confirm scan size, split into batches (ORCHESTRATOR)
 First **count the merged PRs actually available**, then **always ask the user how many PRs to scan**
@@ -225,18 +226,18 @@ Return exactly one adoption verdict per candidate using the verdict definitions 
 `../decision-candidate.md`: `ADOPTED`, `NOT-ADOPTED`, `PARTIAL`, or `NOT-CODE`. Human-attested
 facts skip the adoption check because a diff cannot confirm them.
 
-**Sub-agent output contract:** return a JSON array of candidate decisions — each with
-`{statement, why, futureBenefit, applicationCheck, evidenceType, verdict, confidence,
-evidence:{pr, date, quote, mergeSha, before, after}}`. `futureBenefit` must clearly explain how
-this decision helps future engineers make better decisions in this project; it must be articulate,
-specific, and grounded in project reality (not generic "improves maintainability" filler).
-`applicationCheck` must state how future engineers should apply or verify this decision — concrete
-evidence, code/config shape, test coverage, design constraint, rollout boundary, operational proof,
-or coordination to ask for. The `mergeSha`, `before`, and `after` fields are internal adoption-check
-proof only; use them during
-reduce/review, but do not emit before/after proof into the final decision markdown. **No stable IDs**
-(the orchestrator assigns those after clustering) and **no writes** to `docs/greybeard/`. A batch
-that fails or returns malformed JSON is retried, or the orchestrator processes it directly.
+**Sub-agent output contract:** return the JSON object defined in `subagent.md`.
+Each candidate includes `{statement, why, futureBenefit, applicationCheck, evidenceType, verdict,
+confidence, evidence:{pr, date, quote, mergeSha, before, after}}`. `futureBenefit` must clearly
+explain how this decision helps future engineers make better decisions in this project; it must be
+articulate, specific, and grounded in project reality (not generic "improves maintainability"
+filler). `applicationCheck` must state how future engineers should apply or verify this decision —
+concrete evidence, code/config shape, test coverage, design constraint, rollout boundary,
+operational proof, or coordination to ask for. The `mergeSha`, `before`, and `after` fields are
+internal adoption-check proof only; use them during reduce/review, but do not emit before/after
+proof into the final decision markdown. **No stable IDs** (the orchestrator assigns those after
+clustering) and **no writes** to `docs/greybeard/`. A batch that fails or returns malformed JSON is
+retried, or the orchestrator processes it directly.
 
 ### Stage 5 — Reduce: sort, cluster, dedupe, supersede — ORCHESTRATOR
 0. **Sort the merged candidate pool by `mergedAt` (oldest → newest).** Supersession is applied in
@@ -282,12 +283,9 @@ if the user explicitly approves.
 
 ## Confidence ranking
 
-Record a `confidence` per emitted decision, ranked by evidence strength:
-1. **High** — contested in review **and** adopted in the merged code (two parties + code proof).
-2. **Medium** — stated in the PR description **and** corroborated by the merged code (single
-   party, but the code shipped).
-Do not emit low-confidence decisions. Human-attested facts, PARTIAL candidates, and NOT-ADOPTED
-comments are not low-confidence canon; they are excluded from the final decision files.
+Use the mined confidence rules in `../decision-candidate.md`. Do not emit low-confidence decisions.
+Human-attested facts, PARTIAL candidates, and NOT-ADOPTED comments are not low-confidence canon;
+they are excluded from the final decision files.
 
 ---
 

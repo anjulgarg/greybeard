@@ -62,7 +62,7 @@ Extract three things; ask only for what the author has not already given:
 - **Evidence** — what backs it (drives the evidence type, below).
 
 ### 2. Route the evidence type
-- **Code-verified decision** — a convention / logic / config rule. Evidence = a PR/commit/file
+- **Code-checkable decision** — a convention / logic / config rule. Evidence = a PR/commit/file
   that demonstrates it, or an explicit "go-forward, no code yet."
 - **Human-attested fact** — ownership, a gotcha, or a non-obvious fact no diff can confirm — e.g.
   "this event hub is owned by the platform team, 1 consumer group". **Requires a named attestor**,
