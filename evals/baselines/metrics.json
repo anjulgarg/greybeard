@@ -1,0 +1,34 @@
+{
+  "tier0": {
+    "ok": true,
+    "bankBrokenErrorCount": 8
+  },
+  "tier1": {
+    "total": 12,
+    "scored": 0,
+    "skipped": 12,
+    "correct": 0,
+    "truePositive": 0,
+    "falsePositive": 0,
+    "trueNegative": 0,
+    "falseNegative": 0,
+    "precision": null,
+    "recall": null,
+    "falseAlarmRate": null,
+    "accuracy": null
+  },
+  "tier2": {
+    "total": 4,
+    "scored": 0,
+    "skipped": 4,
+    "correct": 0,
+    "truePositive": 0,
+    "falsePositive": 0,
+    "trueNegative": 0,
+    "falseNegative": 0,
+    "precision": null,
+    "recall": null,
+    "falseAlarmRate": null,
+    "accuracy": null
+  }
+}

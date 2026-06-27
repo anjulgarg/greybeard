@@ -1,0 +1,12 @@
+{
+  "id": "004",
+  "description": "Changes the billing-events schema, the subject of human-attested fact A2 -> advisory to coordinate, never a hard violation.",
+  "bank": "bank-a",
+  "category": "api-compat.md",
+  "change": {
+    "file": "src/events/BillingEvent.cs",
+    "contents": "public sealed class BillingEvent\n{\n    public string EventId { get; set; }\n    // partition key changed from CustomerId to AccountId\n    public string AccountId { get; set; }\n    public decimal Amount { get; set; }\n}\n",
+    "summary": "Repartitions the billing-events schema by changing the partition key from CustomerId to AccountId."
+  },
+  "expect": { "type": "ADVISORY", "decisionId": "A2" }
+}

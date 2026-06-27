@@ -1,0 +1,12 @@
+{
+  "id": "002",
+  "description": "Adds a new field and keeps the deprecated one serialized -> conforms to A1, stay silent.",
+  "bank": "bank-a",
+  "category": "api-compat.md",
+  "change": {
+    "file": "src/api/UserResponse.cs",
+    "contents": "public sealed class UserResponse\n{\n    public string Id { get; set; }\n    [Obsolete(\"Deprecated; removal scheduled next release\")]\n    public string LegacyId { get; set; }\n    public string DisplayName { get; set; }\n    public string Email { get; set; }\n}\n",
+    "summary": "Adds an Email field; the deprecated LegacyId stays serialized behind the Obsolete flag."
+  },
+  "expect": { "type": "SILENT" }
+}

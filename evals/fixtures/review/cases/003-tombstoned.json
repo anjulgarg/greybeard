@@ -1,0 +1,12 @@
+{
+  "id": "003",
+  "description": "Touches the GraphQL versioning subject of the TOMBSTONED decision A3 -> must stay silent (superseded rules are never checked).",
+  "bank": "bank-a",
+  "category": "api-compat.md",
+  "change": {
+    "file": "src/schema/types.graphql",
+    "contents": "type Invoice {\n  id: ID!\n  total: Int!\n  # no @version directive on this type\n}\n",
+    "summary": "Defines a GraphQL type without the @version directive that the superseded decision A3 once required."
+  },
+  "expect": { "type": "SILENT" }
+}
