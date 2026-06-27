@@ -1,0 +1,13 @@
+{
+  "passed": false,
+  "errors": [
+    { "code": "MISSING_FUTURE_BENEFIT", "file": "api-compat.md", "decisionId": "B1" },
+    { "code": "MISSING_APPLICATION_CHECK", "file": "api-compat.md", "decisionId": "B1" },
+    { "code": "INVALID_CONFIDENCE", "file": "api-compat.md", "decisionId": "B1" },
+    { "code": "MISSING_ATTESTOR", "file": "api-compat.md", "decisionId": "B2" },
+    { "code": "MISSING_EVIDENCE", "file": "api-compat.md", "decisionId": "B3" },
+    { "code": "INDEX_BAD_FORMAT", "file": "index.md", "decisionId": null },
+    { "code": "INDEX_MISSING_DECISION", "file": "index.md", "decisionId": "B3" },
+    { "code": "INDEX_UNKNOWN_DECISION", "file": "index.md", "decisionId": "Z9" }
+  ]
+}

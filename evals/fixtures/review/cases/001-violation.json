@@ -1,0 +1,12 @@
+{
+  "id": "001",
+  "description": "Removes a public response field with no deprecation window -> breaks A1.",
+  "bank": "bank-a",
+  "category": "api-compat.md",
+  "change": {
+    "file": "src/api/UserResponse.cs",
+    "contents": "public sealed class UserResponse\n{\n    public string Id { get; set; }\n    // LegacyId removed outright in this change; no deprecation notice shipped.\n    public string DisplayName { get; set; }\n}\n",
+    "summary": "Deletes the LegacyId field from a public response type in one release, with no prior deprecation notice."
+  },
+  "expect": { "type": "VIOLATION", "decisionId": "A1" }
+}
