@@ -40,7 +40,7 @@ ORCHESTRATOR
   - resolve target -> changed files/documents + locations
   - load the CURRENT contents for changed files/documents where available   <- critical, see below
   - list docs/greybeard/ category files; load only LIVE decisions (skip tombstoned/superseded)
-    from the BASE branch, NEVER the PR head — a PR must not weaken the rules it is judged by
+    from the BASE branch for PR/branch targets, or the provided/current bank for other targets
         |
         | fan out one sub-agent per category file (all parallel; count = #category files)
         v
@@ -104,11 +104,11 @@ A report, and optionally PR review comments. Per finding:
   rule:   <one-line statement>
   why:    <the rationale — why this rule exists>
   where:  <file>:<hunk> or <document>:<section>
-  basis:  PR <N> (<date>) — "<original evidence quote>"      <- the payoff: traces to a real decision
+  basis:  <evidence pointer or attestor/review-by> — "<original evidence quote or rationale>"
   fix:    <concrete suggestion, if one is clear>
 ```
 
-Summary line: `N violations, M advisories across K decisions; P files reviewed.`
+Summary line: `N violations, M advisories across K decisions; P targets reviewed.`
 
 If there are **zero** findings, say so plainly — a clean pass is a valid, valuable result, not a
 sign the tool did nothing.
@@ -122,8 +122,9 @@ sign the tool did nothing.
 2. **Current files, not just the diff.** (Validated failure mode #1.)
 3. **Meaning, not line numbers.** (Validated failure mode #2.)
 4. **Never check tombstoned decisions** — flagging a superseded rule is a guaranteed false alarm.
-5. **Read the decision bank from BASE, not the PR head.** Otherwise a PR that edits `docs/greybeard/` to
-   delete a rule could violate it and still pass. The rules are the base branch's, not the author's.
+5. **For PR/branch targets, read the decision bank from BASE, not the PR head.** Otherwise a PR that
+   edits `docs/greybeard/` to delete a rule could violate it and still pass. For other targets, use
+   the provided or current decision bank.
 6. **Cite the evidence on every finding.** An unexplained flag gets ignored; the originating PR/quote
    is what makes the author trust and act on it.
 

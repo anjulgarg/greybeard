@@ -1,13 +1,13 @@
 ---
 name: remember
-description: Manually record ONE engineering decision into the project's decision memory (docs/greybeard/). Interviews the author to extract the rule + rationale + evidence, classifies its evidence type, checks it against the existing bank for duplication/supersession, writes the entry, and opens a review PR. Use right after a design call, or whenever you want to capture a decision by hand instead of mining PR history.
+description: Manually record ONE engineering decision into the project's decision memory (docs/greybeard/). Interviews the author to extract the rule + rationale + evidence, classifies its evidence type, checks it against the existing bank for duplication/supersession, writes the entry, and suggests a review PR as the next step. Use right after a design call, or whenever you want to capture a decision by hand instead of mining PR history.
 ---
 
 # /greybeard:remember
 
 Capture **one** decision the author already knows, by hand. Complements `/greybeard:learn`
 (which mines many decisions from merged history) and feeds the same `docs/greybeard/` store that
-`/greybeard:review` later checks new PRs against.
+`/greybeard:review` later checks future changes against.
 
 The author is the authority here — there is **no adoption check** (a recorded decision may be
 forward-looking, about code that does not exist yet). But the skill still enforces quality: every
@@ -62,8 +62,9 @@ Extract three things; ask only for what the author has not already given:
   that demonstrates it, or an explicit "go-forward, no code yet."
 - **Human-attested fact** — ownership, a gotcha, or a non-obvious fact no diff can confirm — e.g.
   "this event hub is owned by the platform team, 1 consumer group". **Requires a named attestor +
-  a review-by/expiry date**, stored at lower confidence. A world fact with no human owner rots and
-  there is no diff to re-verify it — so human-attested facts without an attestor are rejected.
+  `review-by` date**, stored at lower confidence. The `review-by` date is when the fact should be
+  revalidated or treated as stale. A world fact with no human owner rots and there is no diff to
+  re-verify it — so human-attested facts without an attestor are rejected.
 
 ### 3. Coherence check against the existing bank (read `index.md`, then the category file)
 Before writing, compare the new decision to what is already recorded:
@@ -83,17 +84,23 @@ Before writing, compare the new decision to what is already recorded:
 > as an FYI so the author records the decision knowingly (and can file the follow-up to fix code).
 
 ### 4. Draft the entry + write it
-Render in the standard entry format (below). Append to the right category file, add the `index.md`
+Render in the canonical entry format. Append to the right category file, add the `index.md`
 line, and set confidence:
 - **high** — author + concrete code/PR evidence.
 - **medium** — author assertion; evidence thin or forward-looking.
 - **low-needs-attestation** — human-attested facts, or any entry whose why/evidence the author
   could not fully pin down.
 
-### 5. Open a review PR
-Same human gate as learn — nothing becomes canon until a teammate approves. In the PR body,
-surface the **evidence type**, the **confidence**, and **any supersession this triggers** (so the
-reviewer sees exactly what is being overturned and why).
+Before writing, make sure the entry satisfies the canonical schema's required `Future benefit` and
+`Review check` fields. Derive them from the interview where possible; if either cannot be made
+specific and useful, ask the author for the missing detail or reject the entry as too vague.
+
+### 5. Suggest a review PR
+Same human gate as learn — nothing becomes canon until a teammate approves. Do **not** create a PR
+automatically. After writing the entry, suggest creating a normal review PR as the next step. If the
+user explicitly approves PR creation, the PR body should surface the **evidence type**, the
+**confidence**, and **any supersession this triggers** so the reviewer sees exactly what is being
+overturned and why.
 
 ---
 
@@ -111,7 +118,7 @@ schema shared by `/greybeard:learn`, `/greybeard:remember`, and `/greybeard:revi
 2. **Keep it specific.** An over-broad rule makes `review` flag conformant code — the precision
    failure that destroys trust in the whole system.
 3. **Never silently overwrite a contradicting decision.** Tombstone + human-confirm; keep the trail.
-4. **Human-attested facts without attestor + expiry are forbidden.** There is no diff to re-verify a
-   world fact, so it needs a human owner and a refresh date.
+4. **Human-attested facts without attestor + `review-by` are forbidden.** There is no diff to
+   re-verify a world fact, so it needs a human owner and a refresh date.
 5. **One decision per run.** If the author rattles off several, capture them one at a time so each
    gets a real interview — batch capture is what `/greybeard:learn` is for.

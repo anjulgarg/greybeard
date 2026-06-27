@@ -1,12 +1,12 @@
 ---
 name: learn
-description: Bootstrap a project's decision memory by scanning the last X MERGED pull requests. Mines durable engineering decisions from review comments, PR descriptions, and the merged diffs themselves, verifies each against the merged code (adoption check), and emits reviewed decision markdown files into docs/greybeard/. Run once at setup, or re-run to extend.
+description: Bootstrap a project's decision memory by scanning the last X MERGED pull requests. Mines durable engineering decisions from review comments, PR descriptions, and the merged diffs themselves, verifies each against the merged code (adoption check), and emits generated decision markdown files into docs/greybeard/. Run once at setup, or re-run to extend.
 ---
 
 # /greybeard:learn
 
 Bootstrap (or extend) a repository's **decision memory** by mining its merged pull-request
-history. Produces a reviewed set of decision files under `docs/greybeard/` on the main branch.
+history. Produces a generated set of decision files under `docs/greybeard/` on the main branch.
 
 This is a **one-time / occasional bootstrap**, not a hot path. It is **precision-biased**:
 when in doubt, drop the candidate. A wrong decision is worse than a missing one — a wrong

@@ -1,6 +1,16 @@
 <div align="center">
-  <img src="assets/greybeard-banner.png" alt="Greybeard — institutional memory for AI coding agents. Every commit. Every decision. Every lesson. Remembered." width="720" />
+  <img src="assets/greybeard-mascot-transparent.png" alt="Greybeard mascot" width="180" />
 </div>
+
+<h1 align="center">Greybeard</h1>
+
+<p align="center">
+  <strong>Institutional memory for AI coding agents.</strong>
+</p>
+
+<p align="center">
+  Every commit. Every decision. Every lesson. Remembered.
+</p>
 
 **greybeard** is a **decision-memory** for your codebase. It captures the durable engineering
 decisions that normally live only in a senior engineer's head — the conventions, the hard-won
@@ -24,7 +34,7 @@ Each skill is an **imperative to the greybeard** — *you* command it to learn, 
 | Skill | Invoke | What it does |
 |-------|--------|--------------|
 | **learn** | `/greybeard:learn` | Mines your merged PR history — review comments, PR descriptions, and the merged diffs — for durable decisions, **verifies each against the code that actually shipped**, and bootstraps your `docs/greybeard/` folder. Run once at setup. |
-| **remember** | `/greybeard:remember` | Captures one decision by hand. Interviews you for the rule, the *why*, and the evidence, then opens a PR. Use right after a design call. |
+| **remember** | `/greybeard:remember` | Captures one decision by hand. Interviews you for the rule, the *why*, and the evidence, then suggests a PR as the next step. Use right after a design call. |
 | **review** | `/greybeard:review` | Checks a supplied change against your recorded decisions and flags changes that break one — citing the rule, the *why*, and the original evidence. |
 
 ## How each skill works
@@ -35,15 +45,16 @@ Point `/greybeard:review` at a PR, a diff, a branch, local changes, a document, 
 ask about, and it **spins up one sub-agent for every category decision file in `docs/greybeard/`**.
 `index.md` is just the map and does not get its own reviewer. Each sub-agent owns exactly one
 category file and checks the change *only* against the decisions recorded there — matching by
-**meaning** against the current contents of the changed files, never by line number. The sub-agents
+**meaning** against current contents where available, never by line number. The sub-agents
 run in parallel (≤5, one per topic file), then a reducer merges their
 findings into a single report that flags every change which breaks a recorded decision, citing the
 **rule**, the **why**, and the **original evidence** behind it.
 
 That one-file-per-agent split is deliberate: each reviewer sees a tight, focused slice of the
-decision bank plus the diff and nothing else, which keeps its judgement sharp and false alarms low.
-Decisions are always read from the **base branch**, so a PR can never quietly weaken the very rules
-it is being judged against.
+decision bank plus the supplied change and nothing else, which keeps its judgement sharp and false
+alarms low. For PR and branch targets, decisions are read from the **base branch**, so a PR can
+never quietly weaken the very rules it is being judged against. For other targets, `review` uses the
+provided or current decision bank.
 
 ### `learn` — bootstrap the bank from history
 
@@ -57,7 +68,8 @@ Run it once at setup, or re-run in `extend` mode to fold in newer history.
 
 `/greybeard:remember` records a single decision the moment it's made. It interviews you for the
 rule, the *why*, and the evidence, checks it against the existing bank for duplicates or
-supersession, and opens a PR — so the reasoning is captured before it evaporates.
+supersession, and suggests a PR as the next step — so the reasoning is captured before it
+evaporates.
 
 ## How decisions are stored
 
