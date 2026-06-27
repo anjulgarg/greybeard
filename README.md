@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/greybeard.png" alt="Greybeard — institutional memory for AI coding agents. Every commit. Every decision. Every lesson. Remembered." width="720" />
+  <img src="assets/social-preview.png" alt="Greybeard — institutional memory for AI coding agents. Every commit. Every decision. Every lesson. Remembered." width="720" />
 </div>
 
 **greybeard** is a **decision-memory** for your codebase. It captures the durable engineering
