@@ -55,9 +55,9 @@ Extract four things; ask only for what the author has not already given:
 - **Why** — the durable rationale a future engineer needs and cannot trivially re-derive. **If the
   author cannot articulate a why, push back** — a rule without a why is a style preference, not a
   decision, and it does not get stored.
-- **Scope** — where it applies (which services / layers / file globs). This is what stops
-  `review` from flagging conformant code elsewhere. Over-broad scope is the #1 way a manual
-  entry causes false alarms.
+- **Scope** — internal matching metadata for where it applies (which services / layers / file
+  globs). Use it to choose the category and avoid false matches, but do not emit it into the final
+  markdown entry.
 - **Evidence** — what backs it (drives the evidence type, below).
 
 ### 2. Route the evidence type
@@ -111,8 +111,6 @@ reviewer sees exactly what is being overturned and why).
 - evidence:
   - PR <N> (<date>) — "<verbatim quote or author's stated rationale>"
   - <commit/file/doc pointer, if any>
-- scope: <services / layers / file globs the rule applies to>
-- volatility: low | med | high   reuse-value: low | med | high
 - attestor: <alias>  review-by: <date>      # human-attested only (required)
 - superseded-by: <ID> (<date>)              # only if tombstoned
 ```

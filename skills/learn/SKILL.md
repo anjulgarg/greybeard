@@ -263,11 +263,12 @@ specific, and grounded in project reality (not generic "improves maintainability
 `reviewCheck` must state what reviewers should check in future PRs to apply this decision — concrete
 evidence, code/config shape, test coverage, rollout boundary, or operational proof to ask for. `scope`
 = the file globs / layers the candidate concerned (you just read them in the adoption check) — it
-bounds `review`'s false-fire later. The `mergeSha`, `before`, and `after` fields are internal
-adoption-check proof only; use them during reduce/review, but do not emit before/after proof into the
-final decision markdown. **No stable IDs** (the orchestrator assigns those after clustering) and **no
-writes** to `docs/greybeard/`. A batch that fails or returns malformed JSON is retried, or the
-orchestrator processes it directly.
+bounds `review`'s false-fire later. Scope is internal metadata; use it to route and
+dedupe decisions, but do not emit it into the final decision markdown. The `mergeSha`, `before`, and
+`after` fields are internal adoption-check proof only; use them during reduce/review, but do not emit
+before/after proof into the final decision markdown. **No stable IDs** (the orchestrator assigns
+those after clustering) and **no writes** to `docs/greybeard/`. A batch that fails or returns
+malformed JSON is retried, or the orchestrator processes it directly.
 
 ### Stage 5 — Reduce: sort, cluster, dedupe, supersede — ORCHESTRATOR
 0. **Sort the merged candidate pool by `mergedAt` (oldest → newest).** Supersession is applied in
@@ -340,8 +341,6 @@ decision, such as required evidence, code/config shape, tests, rollout scope, or
 - confidence: high | medium
 - evidence:
   - PR <N> (<date>) — "<verbatim reviewer quote or description excerpt>"
-- scope: <services / layers / file globs the rule applies to>
-- volatility: low | med | high   reuse-value: low | med | high
 - superseded-by: <ID> (<date>)              # only if tombstoned
 ```
 
