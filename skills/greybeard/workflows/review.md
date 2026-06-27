@@ -12,14 +12,17 @@ tool, which destroys the system's value. **When a sub-agent is unsure, it stays 
 
 ## Inputs (auto-detect, confirm)
 
-1. **target** — any supplied change, including:
-   - a **PR number** → diff vs its base (`gh pr diff <N>` / ADO equivalent),
-   - a **branch** → `git diff <base>...HEAD`,
-   - **local changes** → staged/unstaged working tree,
-   - a **diff/patch file**,
-   - a **document or text artifact**.
-   Default: PR if a number is given, else current branch vs its base, else the working tree.
-2. **provider** — `github` / `azure-devops`, for fetching a PR and (optionally) posting comments.
+**target** — any supplied change, including:
+
+- a **PR number** → diff vs its base, fetched with the host's PR tooling,
+- a **branch** → `git diff <base>...HEAD`,
+- **local changes** → staged/unstaged working tree,
+- a **diff/patch file**,
+- a **document or text artifact**.
+
+Default: PR if a number is given, else current branch vs its base, else the working tree. Use
+whatever PR tooling the host provides (auto-detect it) to fetch a PR and, optionally, post comments
+back.
 
 ---
 
@@ -60,11 +63,10 @@ Why per-category-file fan-out:
 
 ---
 
-## What each sub-agent MUST receive (the validated invariants)
+## What each sub-agent MUST receive (the invariants)
 
-1. **Current contents, not just the diff.** For code diffs, both validation errors were diff-only
-   artifacts: a rule can be satisfied or broken by code *outside* the changed hunk. The sub-agent
-   needs full file state to judge when that state is available.
+1. **Current contents, not just the diff.** A rule can be satisfied or broken by code *outside* the
+   changed hunk. The sub-agent needs full file state to judge when that state is available.
 2. **Match by meaning, not line number.** The diff's hunk lines and a decision's original lines will
    not align (squash merges, later iterations, unrelated edits).
 3. **The decision's `why` + `evidence`**, so every flag explains itself and the author can judge
@@ -115,8 +117,8 @@ sign the tool did nothing.
 
 1. **Precision over recall.** Silence beats a false flag. The false-alarm rate is the trust metric —
    guard it above recall.
-2. **Current files, not just the diff.** (Validated failure mode #1.)
-3. **Meaning, not line numbers.** (Validated failure mode #2.)
+2. **Current files, not just the diff.** A rule can be broken by code outside the changed hunk.
+3. **Meaning, not line numbers.** Diff hunk lines and a decision's original lines will not align.
 4. **Never check tombstoned decisions** — flagging a superseded rule is a guaranteed false alarm.
 5. **For PR/branch targets, read the decision bank from BASE, not the PR head.** Otherwise a PR that
    edits `docs/greybeard/` to delete a rule could violate it and still pass. For other targets, use

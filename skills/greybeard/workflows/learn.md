@@ -49,8 +49,6 @@ Ask the user how much history to scan before doing expensive work. Offer:
 
 Also determine:
 
-- `provider` - GitHub (`gh`) or Azure DevOps (`az repos` / `az devops invoke`), auto-detected from
-  remotes when possible.
 - `mode` - `bootstrap` for an empty `docs/greybeard/`, or `extend` to dedupe against existing
   decisions.
 - `maxSubAgents` - at most 5 for the whole run. Use fewer when simpler.
@@ -109,21 +107,15 @@ Capture at least:
 - Merge commit SHA.
 - Merge date.
 
-For GitHub slices, use refs only:
+Fetch refs only at this stage, using whatever PR tooling the host provides (auto-detect it). Capture
+only the lightweight fields above — not full diffs or comment bodies yet.
 
-```bash
-gh pr list --state merged --limit <limit> --json number,title,mergeCommit,mergedAt
-```
+If the host tooling exposes a reliable total count, report it. If not, report the size of the
+selected slice instead of pretending it is a repository-wide total.
 
-For Azure DevOps, list PRs with `status=completed` and capture `pullRequestId`, `lastMergeCommit`,
-`title`, and `closedDate`.
-
-If a provider exposes a reliable total count, report it. If not, report the size of the selected
-slice instead of pretending it is a repository-wide total.
-
-Never map a PR to a commit by grepping for the bare PR number. Prefer the provider's merge-commit
-field. If you must derive a squash-merge commit locally, anchor on the literal merge-message prefix,
-such as `Merged PR <N>:`.
+Never map a PR to a commit by grepping for the bare PR number. Prefer the host's merge-commit field.
+If you must derive a squash-merge commit locally, anchor on the literal merge-message prefix that the
+host uses, such as a `Merged PR <N>:` or `(#<N>)` suffix.
 
 Split the selected PRs into at most 5 work-balanced batches. If comment/thread counts are cheaply
 available, balance by that count; otherwise split by PR count.
@@ -138,7 +130,7 @@ Give each sub-agent:
 
 - The assigned PR refs.
 - `../references/decision-candidate.md`.
-- Enough provider/repo instructions to fetch review comments, PR descriptions, merge-commit bodies,
+- Enough repo instructions to fetch review comments, PR descriptions, merge-commit bodies,
   merged diffs, and final/current file contents needed for adoption checks.
 
 The sub-agent processes one PR at a time and returns only the JSON object defined in

@@ -20,6 +20,12 @@ For each assigned PR:
 
 ## Output
 
+The JSON keys below are a transport shape only. Their meaning is defined by the reference files, which
+are the source of truth: `statement`/`why`/`evidenceType`/`confidence`/`verdict`/`evidence` follow
+`decision-candidate.md`, and `futureBenefit`/`applicationCheck` carry the `Future benefit` /
+`Application check` fields from `decision-format.md`. If those references change, follow them — do not
+treat this shape as an independent definition.
+
 ```json
 {
   "batch": "<batch id>",

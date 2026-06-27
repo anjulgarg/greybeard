@@ -24,6 +24,10 @@ For each live decision in the assigned category:
 
 ## Output
 
+The JSON keys below are a transport shape only. Field meanings follow `decision-format.md` (the
+canonical schema) and the finding fields in `workflows/review.md` (rule, why, location, basis, fix).
+If those change, follow them — do not treat this shape as an independent definition.
+
 ```json
 {
   "category": "<category file>",
