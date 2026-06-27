@@ -1,12 +1,12 @@
 ---
 name: learn
-description: Bootstrap a project's decision memory by scanning the last X MERGED pull requests. Mines durable engineering decisions from review comments, PR descriptions, and the merged diffs themselves, verifies each against the merged code (adoption check), and emits reviewed decision markdown files into docs/greybeard/. Run once at setup, or re-run to extend.
+description: Bootstrap a project's decision memory by scanning the last X MERGED pull requests. Mines durable engineering decisions from review comments, PR descriptions, and the merged diffs themselves, verifies each against the merged code (adoption check), and emits generated decision markdown files into docs/greybeard/. Run once at setup, or re-run to extend.
 ---
 
 # /greybeard:learn
 
 Bootstrap (or extend) a repository's **decision memory** by mining its merged pull-request
-history. Produces a reviewed set of decision files under `docs/greybeard/` on the main branch.
+history. Produces a generated set of decision files under `docs/greybeard/` on the main branch.
 
 This is a **one-time / occasional bootstrap**, not a hot path. It is **precision-biased**:
 when in doubt, drop the candidate. A wrong decision is worse than a missing one — a wrong
@@ -38,8 +38,9 @@ Categories are derived from the decisions, **not** hardcoded. The 5-file cap kee
 broadest** buckets that stay coherent: reuse the closest existing file before opening a new one,
 and once 5 exist, fold a new cluster into its nearest neighbour rather than creating a 6th.
 `evidence-type` is a per-decision entry field, independent of which file holds it. Use
-`code-verified` for rules proven by merged code, and `human-attested` for world facts that code
-cannot prove. Only `code-verified` decisions with an `ADOPTED` verdict are emitted into the final
+`code-checkable` for rules whose application can be checked in code/config/tests/docs, and
+`human-attested` for world facts that code cannot prove. Only `code-checkable` decisions with an
+`ADOPTED` verdict are emitted into the final
 decision files; human-attested facts are review notes, not canon.
 
 ---
@@ -60,9 +61,7 @@ decision files; human-attested facts are review notes, not canon.
 3. **window** — optional date range to bound the scan.
 4. **mode** — `bootstrap` (empty `docs/greybeard/`) or `extend` (dedupe against existing decisions).
 5. **max sub-agents** — hard cap on the **total** number of sub-agents the scan spawns, for the
-   whole run (default & max **5**). This is *not* a concurrency limit: all of them run in parallel.
-   A large repo is absorbed by bigger batches + per-PR streaming, never by more agents (see
-   **Sizing**).
+   whole run (default & max **5**). Use fewer or run inline when that is simpler.
 6. **large-scan warning threshold** — comment-threads *per sub-agent* above which the run is
    flagged as large and slow (default **~250**). It does not add agents (the cap is 5); it prompts
    the user to lower **X** or narrow the **window** instead.
@@ -81,10 +80,11 @@ ORCHESTRATOR (single-threaded, cheap)
         |
         |  fan out <=5 sub-agents total (one per batch, all parallel)
         v
-  SUB-AGENTS (<=5, parallel, read-only, stateless)   <- a batch of PR refs
+  SUB-AGENTS (<=5, parallel, independent)   <- a batch of PR refs
     Stage 1  walk THIS batch PR-by-PR: fetch threads + description, STREAM candidates to a
              file, release each PR's context before the next (batch size is unbounded)
-    Stages 2–4  pre-filter, route, adoption-check (local `git show`, read current files)
+    Stages 2–4  apply decision-candidate rules, route, adoption-check (local `git show`,
+                 read current files)
     return: structured candidate decisions JSON (id-less), each tagged {mergeSha, mergedAt,
             evidenceType, verdict, confidence, evidence}. They NEVER write to docs/greybeard/.
         |
@@ -96,8 +96,8 @@ ORCHESTRATOR (single-threaded, cheap)
 ```
 
 Rules that keep parallelism *correct*, not just fast:
-- **Sub-agents are read-only.** Only the orchestrator writes `docs/greybeard/`. Parallel writes would
-  race and make supersession undefined.
+- **Sub-agents may write scratch/output files.** Only the orchestrator writes final
+  `docs/greybeard/` files. Parallel final writes would race and make supersession undefined.
 - **Ordering lives in the reduce, not the map.** Recency-wins supersession is applied in Stage 5
   by sorting the merged candidate pool on `mergedAt` — NOT by relying on PR processing order.
   This is why batching is safe.
@@ -105,9 +105,8 @@ Rules that keep parallelism *correct*, not just fast:
   cheap *list* call to get PR refs + merge SHAs — it never fetches threads. Each sub-agent then
   fetches its own batch's threads + descriptions **in parallel**, which parallelizes the slow I/O.
   This is the expensive stage, so parallelizing it is the main speedup.
-- **At most 5 sub-agents, total — not a concurrency cap.** The whole scan spawns ≤5; all run in
-  parallel (5 stays comfortably under `gh`/`az` secondary rate limits). Because the *count* is
-  fixed, a large repo is absorbed by **bigger batches + per-PR streaming** (see **Sizing**), never
+- **At most 5 sub-agents, total.** The whole scan spawns ≤5; run them in parallel when parallelism
+  helps. A large repo is absorbed by **bigger batches + per-PR streaming** (see **Sizing**), never
   by more agents.
 - **Replayability.** Each sub-agent dumps its batch's raw fetch to a file, so a run is
   inspectable and individually re-runnable.
@@ -119,41 +118,39 @@ Rules that keep parallelism *correct*, not just fast:
 
 ## Sizing: how many sub-agents
 
-**One rule: at most 5 sub-agents for the entire scan.** A hard cap on the *total* number of
-sub-agents spawned — *not* a concurrency limit, not a per-wave count. The orchestrator partitions
-all eligible PRs into **at most 5 work-balanced batches** and launches **one sub-agent per batch**;
-all run in parallel (5 is small enough to need no wave or queue management).
-
-`B (sub-agents launched) = min(5, selected_merged_PRs)` for normal scans.
-
-- **Tiny scans run inline.** If the selected slice has about 10 PRs or fewer, skip fan-out.
-- **Small scans use fewer.** 3 selected PRs → 3 sub-agents, not 5 — don't spawn idle agents.
-- **Large scans use exactly 5** — each just gets a bigger batch, absorbed by streaming (below).
+Use **at most 5 sub-agents for the entire scan**. The orchestrator chooses the simplest useful
+strategy: run inline for tiny scans, use fewer agents for small scans, and use up to 5 agents when
+parallelism will materially help. Do not spawn idle agents just to reach the cap.
 
 **Put every selected merged PR in exactly one batch.** Do not special-case PRs with zero comments:
 their descriptions can still contain decisions. If comment/thread counts are already available
 cheaply, balance batches by that count; otherwise split by PR count and move on.
 
 **A batch can be large, so each sub-agent STREAMS — it never holds its whole batch in context.**
-With only 5 agents, a 1000-PR scan puts ~200 PRs in each. The sub-agent processes its batch **one
+For large scans, the sub-agent processes its batch **one
 PR at a time** — fetch → pre-filter → route → adoption-check → **append that PR's candidates to its
 output file → drop the PR's diff/file contents from context** → next PR. Only the small running
-candidate list stays resident. This is what lets a fixed 5 agents absorb any repo size (see Stage 1).
+candidate list stays resident. This is what lets a fixed cap absorb large repos (see Stage 1).
 
-**Guardrail for very large scans.** Per-agent load ≈ total_threads / 5. If that exceeds the
-**large-scan warning threshold** (default ~250 threads/agent), the orchestrator **warns** that the
-run will be large and slow and suggests lowering **X** or narrowing the **window** — since the
-agent count is fixed, scanning fewer PRs is the only lever that cuts per-agent load.
+**Guardrail for very large scans.** Estimate per-agent load from the planned batches. If that
+exceeds the **large-scan warning threshold** (default ~250 threads/agent), the orchestrator
+**warns** that the run will be large and slow and suggests lowering **X** or narrowing the
+**window**.
 
 **Worked examples:**
-- **8 PRs selected:** run inline.
-- **46 PRs selected:** 5 batches, each with every assigned PR processed one at a time.
-- **1000 PRs selected:** still 5 batches; warn if the known thread load exceeds the guardrail and
-  offer to narrow the scan.
+- **8 PRs selected:** likely run inline.
+- **46 PRs selected:** use a few work-balanced batches if parallel fetch will help.
+- **1000 PRs selected:** use up to 5 batches; warn if the known thread load exceeds the guardrail
+  and offer to narrow the scan.
 
 ---
 
 ## Pipeline (6 stages, map-reduce)
+
+Before starting Stage 1, read `../decision-candidate.md`. That file is the canonical source for
+what counts as a decision candidate, what must be dropped, evidence routing, and adoption verdicts.
+Every sub-agent must receive and apply those rules. This skill owns orchestration; the shared file
+owns candidate judgment.
 
 ### Stage 0 — Enumerate eligible PRs, confirm scan size, split into batches (ORCHESTRATOR)
 First **count the merged PRs actually available**, then **always ask the user how many PRs to scan**
@@ -205,57 +202,38 @@ The third source — **the merged diff** — is not fetched from the API: it is 
 via `git show <mergeSha>` during the Stage-4 adoption check (local git has no rate limit).
 
 ### Stage 2 — Cheap pre-filter (drop the noise) — SUB-AGENT, per batch
-Most review activity is not a decision. Drop candidates that fail any of:
-- **G1 Engagement** — the item (comment OR description point) must have either (a) led to a
-  merged code change, or (b) drawn a substantive human reply. Drop drive-by status noise
-  (coverage bumps, "open N days", "LGTM", pure questions, nits) that did neither.
-- **G2 Generalizable** — the rule must apply to a *future, different* PR, not just this one.
-  Drops one-off bug reports, context clarifications, "fix this typo here".
-- **G3 Has a "why"** — it must encode durable rationale a future engineer needs and cannot
-  trivially re-derive. A purely mechanical one-off edit fails even if it was adopted.
-
-Expect roughly **~15–20%** of comments to survive this stage. Keep PR-description candidates
-that clearly assert a generalizable rule + rationale.
+Apply `../decision-candidate.md` strictly. Most review activity is not a decision; keep only items
+that pass the shared durability, generalizability, why, evidence, and application-check rules.
+Expect roughly **~15–20%** of comments to survive this stage.
 
 ### Stage 3 — Route each surviving candidate — SUB-AGENT, per batch
-- **Code-verified decision** — a convention / logic / config rule about the codebase that the
-  merged diff or current files can prove.
-- **Human-attested fact** — a fact, ownership detail, or gotcha that no diff can confirm — e.g.
-  "this event hub is owned by the platform team and has 1 consumer group". These require a named
-  human attestor before they can be considered, but `/learn` does **not** emit them as decisions.
+Use the evidence routes in `../decision-candidate.md`:
+- **Code-checkable decision** — continue to Stage 4.
+- **Human-attested fact** — report as not emitted / needs human follow-up. `/learn` does **not**
+  emit these as decisions.
 
-### Stage 4 — Adoption check (the core — code-verified decisions only) — SUB-AGENT, per batch
-Within its batch, the sub-agent runs this for each code-verified candidate using the **full
+### Stage 4 — Adoption check (the core — code-checkable decisions only) — SUB-AGENT, per batch
+Within its batch, the sub-agent runs this for each code-checkable candidate using the **full
 context**, never just the comment:
 
-> Inputs: the candidate statement + verbatim quote; the file(s) it concerns; the **merged diff
-> of those files** (`git show <mergeSha> -- <path>`, run locally); and the **final/current
-> contents** of those files. Match by **semantic content, not comment line numbers** — squash
-> merges and later review iterations move the lines the comment originally pointed at.
+> Inputs: the candidate statement + verbatim quote; the file(s) it concerns; the **merged diff of
+> those files** (`git show <mergeSha> -- <path>`, run locally); and the **final/current contents**
+> of those files. Match by **semantic content, not comment line numbers** — squash merges and later
+> review iterations move the lines the comment originally pointed at.
 
-The sub-agent returns exactly one verdict per candidate:
-- **ADOPTED** — the merged code moved in the candidate's direction → **keep** the decision.
-- **NOT-ADOPTED** — the merged code did *not* change as the comment asked (or did the opposite)
-  → **DROP**. (This is the gate that kills the inverted-sampling failure.)
-- **PARTIAL** — partly adopted, or adopted as a *documented deviation* rather than the literal
-  ask → **flag for human**, do not emit as a decision. (Real example: a reviewer asked to move a
-  param before `CancellationToken`; the team instead kept it after, with a documenting comment.
-  The convention is real, but the literal change was not made.)
-- **NOT-CODE** — turns out to assert about the world, not code → reroute to
-  **human-attested fact**.
-
-Human-attested facts skip the adoption check because a diff cannot confirm them. They may be
-reported separately as "not emitted / needs human follow-up", but they are not emitted as decisions
-by `/learn`.
+Return exactly one adoption verdict per candidate using the verdict definitions in
+`../decision-candidate.md`: `ADOPTED`, `NOT-ADOPTED`, `PARTIAL`, or `NOT-CODE`. Human-attested
+facts skip the adoption check because a diff cannot confirm them.
 
 **Sub-agent output contract:** return a JSON array of candidate decisions — each with
-`{statement, why, futureBenefit, reviewCheck, evidenceType, verdict, confidence,
+`{statement, why, futureBenefit, applicationCheck, evidenceType, verdict, confidence,
 evidence:{pr, date, quote, mergeSha, before, after}}`. `futureBenefit` must clearly explain how
 this decision helps future engineers make better decisions in this project; it must be articulate,
 specific, and grounded in project reality (not generic "improves maintainability" filler).
-`reviewCheck` must state what reviewers should check in future PRs to apply this decision — concrete
-evidence, code/config shape, test coverage, rollout boundary, or operational proof to ask for. The
-`mergeSha`, `before`, and `after` fields are internal adoption-check proof only; use them during
+`applicationCheck` must state how future engineers should apply or verify this decision — concrete
+evidence, code/config shape, test coverage, design constraint, rollout boundary, operational proof,
+or coordination to ask for. The `mergeSha`, `before`, and `after` fields are internal adoption-check
+proof only; use them during
 reduce/review, but do not emit before/after proof into the final decision markdown. **No stable IDs**
 (the orchestrator assigns those after clustering) and **no writes** to `docs/greybeard/`. A batch
 that fails or returns malformed JSON is retried, or the orchestrator processes it directly.
@@ -264,7 +242,7 @@ that fails or returns malformed JSON is retried, or the orchestrator processes i
 0. **Sort the merged candidate pool by `mergedAt` (oldest → newest).** Supersession is applied in
    this order — *here in the reduce*, not by PR processing order — which is what makes the
    parallel map safe.
-1. **Filter final decisions to only ADOPTED code-verified candidates.** Human-attested facts,
+1. **Filter final decisions to only ADOPTED code-checkable candidates.** Human-attested facts,
    PARTIAL candidates, NOT-CODE candidates, and NOT-ADOPTED candidates are not emitted as decisions.
    Count them in the run summary as "not emitted / needs human follow-up" where useful, but keep the
    canonical decision files clean.
@@ -272,7 +250,7 @@ that fails or returns malformed JSON is retried, or the orchestrator processes i
    (same guidance re-litigated across PRs/reviewers) is a strong **confidence booster** — record
    every occurrence. (Real example: a "safer defaults" config rule recurred across 3 PRs over 3
    months — exactly the repeated cost a decision memory removes.) When clustering, preserve or
-   synthesize one clear `futureBenefit` and one actionable `reviewCheck` for the clustered decision
+   synthesize one clear `futureBenefit` and one actionable `applicationCheck` for the clustered decision
    from the strongest evidence.
 3. **Group into ≤5 category files and assign stable IDs.** Derive emergent topic buckets from the
    clustered decisions (not a fixed list); choose the **fewest, broadest** files that stay coherent,
@@ -315,7 +293,7 @@ comments are not low-confidence canon; they are excluded from the final decision
 
 ## Decision entry format
 
-Read `../decision-entry-format.md` before writing or updating entries. That file is the canonical
+Read `../decision-format.md` before writing or updating entries. That file is the canonical
 schema shared by `/greybeard:learn`, `/greybeard:remember`, and `/greybeard:review`.
 
 ---
@@ -337,7 +315,7 @@ schema shared by `/greybeard:learn`, `/greybeard:remember`, and `/greybeard:revi
 
 ## Output summary to the user
 
-After the run, report: PRs scanned, candidates after pre-filter, emitted ADOPTED code-verified
+After the run, report: PRs scanned, candidates after pre-filter, emitted ADOPTED code-checkable
 decision count, not-emitted counts (NOT-ADOPTED, PARTIAL, human-attested / NOT-CODE), and the path
 to the generated `docs/greybeard/` files. Also list each generated markdown file with its decision
 count so the user knows what to review, e.g.:

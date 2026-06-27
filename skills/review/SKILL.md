@@ -1,6 +1,6 @@
 ---
 name: review
-description: Check a PR, diff, branch, local change set, document, or other supplied change against the project's recorded decisions (docs/greybeard/) and flag changes that violate them. Fans out one read-only sub-agent per decision category file; each matches the change — WITH current file/document contents where available, by meaning not line number — against its decisions and reports only high-confidence violations, citing the rule, the why, and the originating evidence. Precision-biased: a false alarm costs more than a miss.
+description: Check a PR, diff, branch, local change set, document, or other supplied change against the project's recorded decisions (docs/greybeard/) and flag changes that violate them. Fans out one sub-agent per decision category file; each matches the change — WITH current file/document contents where available, by meaning not line number — against its decisions and reports only high-confidence violations, citing the rule, the why, and the originating evidence. Precision-biased: a false alarm costs more than a miss.
 ---
 
 # /greybeard:review
@@ -40,19 +40,20 @@ ORCHESTRATOR
   - resolve target -> changed files/documents + locations
   - load the CURRENT contents for changed files/documents where available   <- critical, see below
   - list docs/greybeard/ category files; load only LIVE decisions (skip tombstoned/superseded)
-    from the BASE branch, NEVER the PR head — a PR must not weaken the rules it is judged by
+    from the BASE branch for PR/branch targets, or the provided/current bank for other targets
         |
         | fan out one sub-agent per category file (all parallel; count = #category files)
         v
-  SUB-AGENT (read-only)   <- one category file + the change + current contents where available
+  SUB-AGENT   <- one category file + the change + current contents where available
     for each LIVE decision that appears semantically relevant to the change:
       does this change move AGAINST the rule?  match by MEANING, not line number
-      emit { decision_id, evidenceType, location, why, confidence, fix? }  ONLY if high-confidence
+      emit { decision_id, evidenceType, location, why, decisionConfidence, fix? }  ONLY if the
+      finding itself is high-confidence
         |
         | collect all sub-agent findings
         v
   ORCHESTRATOR
-    dedupe, rank (code-verified violations by confidence first, advisories last),
+    dedupe, rank (code-checkable violations by decision confidence first, advisories last),
     render report  and/or  post PR review comments
 ```
 
@@ -60,7 +61,8 @@ Why per-category-file fan-out:
 - **Bounded** by category count (**≤5**, enforced when decisions are written) — no extra concurrency cap or streaming required. If one category
   file holds an unusually large number of decisions, that sub-agent walks them decision-by-decision.
 - **Tight context** — each sub-agent sees one category's rules + the supplied change, nothing else.
-- **Read-only** — only the orchestrator emits the single report; no write races.
+- **Single final output** — sub-agents may write scratch findings, but only the orchestrator emits
+  the final report or posts comments.
 
 ---
 
@@ -78,12 +80,12 @@ Why per-category-file fan-out:
 
 ## Evidence-type handling
 
-- **Code-verified decisions** — directly checkable. Flag a **violation** when the change moves
+- **Code-checkable decisions** — directly checkable. Flag a **violation** when the change moves
   *against* the rule.
 - **Human-attested facts** — a diff cannot "violate" a fact. Instead emit an **advisory** when the
   change touches the fact's subject ("this edits the event hub owned by `<team>` — coordinate?").
   Advisory, never a blocking violation.
-- **Confidence weighting** — `low-needs-attestation` decisions produce **advisories at most**, never
+- **Confidence weighting** — `low` decisions produce **advisories at most**, never
   hard violations (they are unverified by design).
 
 ---
@@ -100,15 +102,15 @@ Why per-category-file fan-out:
 A report, and optionally PR review comments. Per finding:
 
 ```
-[VIOLATION | ADVISORY]  <decision_id>  (<category>)  conf:<high|med>
+[VIOLATION | ADVISORY]  <decision_id>  (<category>)  decision-conf:<high|medium|low>
   rule:   <one-line statement>
   why:    <the rationale — why this rule exists>
   where:  <file>:<hunk> or <document>:<section>
-  basis:  PR <N> (<date>) — "<original evidence quote>"      <- the payoff: traces to a real decision
+  basis:  <evidence pointer or attestor> — "<original evidence quote or rationale>"
   fix:    <concrete suggestion, if one is clear>
 ```
 
-Summary line: `N violations, M advisories across K decisions; P files reviewed.`
+Summary line: `N violations, M advisories across K decisions; P targets reviewed.`
 
 If there are **zero** findings, say so plainly — a clean pass is a valid, valuable result, not a
 sign the tool did nothing.
@@ -122,12 +124,13 @@ sign the tool did nothing.
 2. **Current files, not just the diff.** (Validated failure mode #1.)
 3. **Meaning, not line numbers.** (Validated failure mode #2.)
 4. **Never check tombstoned decisions** — flagging a superseded rule is a guaranteed false alarm.
-5. **Read the decision bank from BASE, not the PR head.** Otherwise a PR that edits `docs/greybeard/` to
-   delete a rule could violate it and still pass. The rules are the base branch's, not the author's.
+5. **For PR/branch targets, read the decision bank from BASE, not the PR head.** Otherwise a PR that
+   edits `docs/greybeard/` to delete a rule could violate it and still pass. For other targets, use
+   the provided or current decision bank.
 6. **Cite the evidence on every finding.** An unexplained flag gets ignored; the originating PR/quote
    is what makes the author trust and act on it.
 
 ## Decision entry format
 
-Read `../decision-entry-format.md` before interpreting entries. That file is the canonical schema
+Read `../decision-format.md` before interpreting entries. That file is the canonical schema
 shared by `/greybeard:learn`, `/greybeard:remember`, and `/greybeard:review`.
